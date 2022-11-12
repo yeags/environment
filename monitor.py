@@ -128,7 +128,7 @@ class pmsFigure(tk.Frame):
             figsize=(1280 / self.screen_dpi, 500 / self.screen_dpi),
             dpi=self.screen_dpi)
         self.pms_plot = FigureCanvasTkAgg(self.fig, master=self)
-        (concentration, counts) = self.generate_data()
+        concentration, counts = self.generate_data()
         self.pms_concentration.bar(concentration.keys(), concentration.values())
         self.pms_counts.bar(counts.keys(), counts.values())
         self.pms_concentration.set_title('Particle Concentration')
@@ -150,8 +150,36 @@ class pmsFigure(tk.Frame):
         return (concentration, counts)
 
 class ReadArchive:
-    def __init__(self, timespan):
-        self.timespan = timespan
+    def __init__(self):
+        self.timespan_dict = {'1hr': slice(1, 1+1), '8hr': slice(1, 8+1), '24hr': slice(1, 24+1), '7d': slice(1, 168+1),
+                              '1m': slice(1, 720+1), '6m': slice(1, 4380+1), '1y': slice(1, 8760+1)}
+        self.fn_format = '%Y-%m-%d %H-%M-%S'
+        self.re_compile = re.compile(r'\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}')
+
+    def read_files(self):
+        files = os.listdir('./data')
+        files_str = ' '.join(files)
+        fn_list = re.findall(self.re_compile, files_str)
+        fn_timestamp = []
+        for fn in fn_list:
+            fn_timestamp.append(datetime.strptime(fn, self.fn_format).timestamp())
+        self.fn_dict = dict(zip(fn_timestamp, fn_list))
+        self.timestamp_list = fn_timestamp.sort(reverse=True)
+    
+    def load_data(self, timespan = '1hr'):
+        data_fn = self.timestamp_list[self.timespan_dict[timespan]]
+        data_fn.sort()
+        contents_list = []
+        for file in data_fn:
+            with open('./data/'+file+'.txt') as f:
+                f.readline()
+                contents_list.append(f.read())
+        if len(contents_list) > 1:
+            contents = '\n'.join(contents_list)
+        else:
+            contents = contents_list[0]
+        
+
 
 class ReadSensors:
     def __init__(self):
