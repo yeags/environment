@@ -42,7 +42,7 @@ class Monitor(tk.Tk):
         return data_fn
     
     def close_app(self):
-        self.destroy
+        self.destroy()
     
     def create_thp_plot(self):
         self.thp_figure = thpFigure(self.root_frame)
@@ -65,7 +65,7 @@ class Monitor(tk.Tk):
         btn_6month = ttk.Button(self.toolbar, text='6 Month', command=lambda: self.refresh_plots('6m'))
         btn_1year = ttk.Button(self.toolbar, text='1 Year', command=lambda: self.refresh_plots('1y'))
         btn_exit = ttk.Button(self.toolbar, text='Exit', command=self.close_app)
-        self.status_bar.grid(row=0, column=0, sticky='w')
+        self.status_bar.grid(row=0, column=0, sticky='ew')
         btn_realtime.grid(row=0, column=1, padx=(10,5), sticky='w')
         btn_1hr.grid(row=0, column=2, padx=5, sticky='w')
         btn_8hr.grid(row=0, column=3, padx=5, sticky='w')
@@ -181,17 +181,22 @@ class ReadArchive:
         
 
 
-class ReadSensors:
+class Sensors:
     def __init__(self):
-        self.reset_counter = 0
+        self.loop_counter = 0
         self.reset_threshold = 720
         self.sampling_delay = 5
         self.reset_pin = None
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.bme280 = adafruit_bme280.Adafruit_BME280_I2C(self.i2c)
         self.reset_pin = None
-        self.uart = serial.Serial('/dev/ttyS0', baudrate=9600, timeout=None)
-        self.pm25 = adafruit_pm25.PM25_UART(self.uart, self.reset_pin)
+        self.savefile = None
+        try:
+            self.uart = serial.Serial('/dev/ttyS0', baudrate=9600, timeout=None)
+            self.pm25 = adafruit_pm25.PM25_UART(self.uart, self.reset_pin)
+        except serial.SerialException:
+            self.popup('Serial port not found.')
+        self.header = 'timestamp temperature humidity pressure pm10_standard pm25_standard pm100_standard pm10_env pm25_env pm100_env particles_03um particles_05um particles_10um particles_25um particles_50um particles_100um\n'
         self.nan_dict = {
             'pm10 standard': None,
             'pm25 standard': None,
@@ -208,30 +213,51 @@ class ReadSensors:
             }
         self.file_state = 0
         self.filename = None
+    
+    def popup(msg):
+        popup = tk.Tk()
+        popup.wm_title("!")
+        label = ttk.Label(popup, text=msg)
+        label.pack(side="top", fill="x", pady=10)
+        B1 = ttk.Button(popup, text="OK", command = popup.destroy)
+        B1.pack()
+        popup.mainloop()
 
     def read_sensors(self):
-        while self.reset_counter < 720:    
-            now = time()
-            timestamp = datetime.fromtimestamp(now).strftime('%Y-%m-%d %H:%M:%S')
-            temperature = self.bme280.temperature
-            humidity = self.bme280.humidity
-            pressure = self.bme280.pressure
-            try:
-                particles = self.pm25.read()
-            except RuntimeError:
-                particles = self.nan_dict
-            
-            self.reset_counter += 1
-            
+        now = datetime.now()
+        # timestamp = datetime.fromtimestamp(now).strftime('%Y-%m-%d %H:%M:%S')
+        temperature = self.bme280.temperature
+        humidity = self.bme280.humidity
+        pressure = self.bme280.pressure
+        try:
+            particles = self.pm25.read()
+        except RuntimeError:
+            particles = self.nan_dict
+        particles_packet = ''
+        for value in particles.values():
+            particles_packet += str(value) + ' '
+        particles_packet = particles_packet[:-1]
+        packet = f"{now} {round(temperature, 1)} {round(humidity, 1)} {round(pressure, 1)} {particles_packet}\n"
+        return packet
     
-    def open_file(self, filename):
-        pass
+    def start_loop(self):
+        fn_dt = datetime.now()
+        self.init_file(fn_dt)
+        while self.loop_counter < self.reset_threshold:
+            sample = self.read_sensors()
+            self.savefile.write(sample)
+            sleep(self.sampling_delay)
+            self.loop_counter += 1
+        self.loop_counter = 0
+        self.close_file()
 
-    def save_data(self, data):
-        pass
+    def init_file(self, dt: datetime):
+        filename = dt.strftime('%Y-%m-%d %H-%M-%S') + '.txt'
+        self.savefile = open(filename, 'w')
+        self.savefile.write(self.header)
 
-    def close_file(self, filename):
-        pass
+    def close_file(self):
+        self.savefile.close()
 
 if __name__ == '__main__':
     test = Monitor()
