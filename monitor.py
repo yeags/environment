@@ -246,6 +246,7 @@ class Sensors:
         return packet
     
     def start_loop(self):
+        # loop while daemon_status is set to True
         while self.daemon_status:
             fn_dt = datetime.now()
             self.init_file(fn_dt)
@@ -257,6 +258,9 @@ class Sensors:
                 sleep(self.sampling_delay)
                 self.savefile.close()
                 self.loop_counter += 1
+            # empty queue and reset counter once it reaches reset threshold
+            for i in range(self.mp_queue.qsize()):
+                self.mp_queue.get()
             self.loop_counter = 0
 
     def init_file(self, dt: datetime):
