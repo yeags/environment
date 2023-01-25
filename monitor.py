@@ -190,7 +190,6 @@ class Sensors:
         self.reset_pin = None
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.bme280 = adafruit_bme280.Adafruit_BME280_I2C(self.i2c)
-        self.reset_pin = None
         self.savefile = None
         try:
             self.uart = serial.Serial('/dev/ttyS0', baudrate=9600, timeout=None)
@@ -264,7 +263,7 @@ class Sensors:
             self.loop_counter = 0
 
     def init_file(self, dt: datetime):
-        filename = dt.strftime('%Y-%m-%d %H-%M-%S') + '.txt'
+        filename = './data/' + dt.strftime('%Y-%m-%d %H-%M-%S') + '.txt'
         self.savefile = open(filename, 'w')
         self.savefile.write(self.header)
         self.savefile.close()
