@@ -1,6 +1,6 @@
 from multiprocessing import Process, Queue
 from datetime import datetime
-from time import time, sleep
+from time import sleep
 import tkinter as tk
 from tkinter import ttk
 import pandas as pd
@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import serial
-import os, re
+import os, re, sys
 # Raspberry Pi specific libraries below
 try:
     import board
@@ -43,7 +43,8 @@ class Monitor(tk.Tk):
     
     def close_app(self):
         self.destroy()
-    
+        sys.exit()
+
     def create_thp_plot(self):
         self.thp_figure = thpFigure(self.root_frame)
         self.thp_figure.grid(row=0, column=0, sticky='nsew')
@@ -214,7 +215,7 @@ class Sensors:
         self.file_state = 0
         self.filename = None
         self.daemon_status = True
-        self.mp_queue = Queue()
+        self.sampling_buffer = Queue()
         self.daemon = Process(target=self.start_loop)
         self.daemon.start()
     
@@ -253,13 +254,13 @@ class Sensors:
                 self.savefile = open(self.savefile.name, 'a')
                 sample = self.read_sensors()
                 self.savefile.write(sample)
-                self.mp_queue.put(sample)
+                self.sampling_buffer.put(sample)
                 sleep(self.sampling_delay)
                 self.savefile.close()
                 self.loop_counter += 1
             # empty queue and reset counter once it reaches reset threshold
-            for i in range(self.mp_queue.qsize()):
-                self.mp_queue.get()
+            for i in range(self.sampling_buffer.qsize()):
+                self.sampling_buffer.get()
             self.loop_counter = 0
 
     def init_file(self, dt: datetime):
@@ -267,6 +268,24 @@ class Sensors:
         self.savefile = open(filename, 'w')
         self.savefile.write(self.header)
         self.savefile.close()
+    
+    def to_num(self, sample: str):
+        sample = sample.split(' ')
+        nums = []
+        i = 0
+        while i < 4:
+            try:
+                nums.append(float(sample[i]))
+            except ValueError:
+                nums.append(np.nan)
+            i += 1
+        while i < len(sample):
+            try:
+                nums.append(int(sample[i]))
+            except ValueError:
+                nums.append(np.nan)
+            i += 1
+        return nums
 
 if __name__ == '__main__':
     test = Monitor()
