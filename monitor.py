@@ -110,7 +110,7 @@ class thpFigure(tk.Frame):
         self.p.grid()
         self.thp_plot.draw()
     
-    def update_plot(self, timeline, data):
+    def update_plot(self, data):
         pass
 
 class pmsFigure(tk.Frame):
@@ -141,10 +141,13 @@ class pmsFigure(tk.Frame):
         self.fig.subplots_adjust(bottom=0.1, top=0.95)
         self.pms_plot.draw()
     
-    def update_plot(self, timeline, data):
+    def update_plot(self, data):
         pass
 
     def generate_data(self):
+        """
+        This function is for sandboxing only.  Will be removed in the future.
+        """
         concentration = {'1.0': 234, '2.5': 45, '10.0': 22}
         counts = dict(zip(self.particle_sizes, [2500, 855, 127, 50, 8, 2]))
         return (concentration, counts)
@@ -178,8 +181,6 @@ class ReadArchive:
             contents = '\n'.join(contents_list)
         else:
             contents = contents_list[0]
-        
-
 
 class Sensors:
     def __init__(self):
@@ -195,7 +196,7 @@ class Sensors:
             self.uart = serial.Serial('/dev/ttyS0', baudrate=9600, timeout=None)
             self.pm25 = adafruit_pm25.PM25_UART(self.uart, self.reset_pin)
         except serial.SerialException:
-            self.popup('Serial port not found.')
+            self.popup('Serial device not found.')
         self.header = 'timestamp temperature humidity pressure pm10_standard pm25_standard pm100_standard pm10_env pm25_env pm100_env particles_03um particles_05um particles_10um particles_25um particles_50um particles_100um\n'
         self.nan_dict = {
             'pm10 standard': None,
@@ -213,6 +214,10 @@ class Sensors:
             }
         self.file_state = 0
         self.filename = None
+        self.daemon_status = True
+        self.mp_queue = Queue()
+        self.daemon = Process(target=self.start_loop)
+        self.daemon.start()
     
     def popup(msg):
         popup = tk.Tk()
@@ -237,26 +242,27 @@ class Sensors:
         for value in particles.values():
             particles_packet += str(value) + ' '
         particles_packet = particles_packet[:-1]
-        packet = f"{now} {round(temperature, 1)} {round(humidity, 1)} {round(pressure, 1)} {particles_packet}\n"
+        packet = f"{now.timestamp()} {round(temperature, 1)} {round(humidity, 1)} {round(pressure, 1)} {particles_packet}\n"
         return packet
     
     def start_loop(self):
-        fn_dt = datetime.now()
-        self.init_file(fn_dt)
-        while self.loop_counter < self.reset_threshold:
-            sample = self.read_sensors()
-            self.savefile.write(sample)
-            sleep(self.sampling_delay)
-            self.loop_counter += 1
-        self.loop_counter = 0
-        self.close_file()
+        while self.daemon_status:
+            fn_dt = datetime.now()
+            self.init_file(fn_dt)
+            while self.loop_counter < self.reset_threshold:
+                self.savefile = open(self.savefile.name, 'a')
+                sample = self.read_sensors()
+                self.savefile.write(sample)
+                self.mp_queue.put(sample)
+                sleep(self.sampling_delay)
+                self.savefile.close()
+                self.loop_counter += 1
+            self.loop_counter = 0
 
     def init_file(self, dt: datetime):
         filename = dt.strftime('%Y-%m-%d %H-%M-%S') + '.txt'
         self.savefile = open(filename, 'w')
         self.savefile.write(self.header)
-
-    def close_file(self):
         self.savefile.close()
 
 if __name__ == '__main__':
