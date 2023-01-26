@@ -17,6 +17,41 @@ try:
 except ModuleNotFoundError:
     pass
 
+def txt2num(sample: str):
+    sample = sample.split(' ')
+    nums = []
+    for value in sample:
+        try:
+            nums.append(float(value))
+        except ValueError:
+            nums.append(np.nan)
+    return nums
+
+def create_df(filename: str) -> pd.DataFrame:
+    with open(filename) as file:
+        header = file.readline()
+        data = file.read()
+    
+    header = header[:-1].split(' ')
+    data_lines = data[:-1].split('\n')
+    data_array = []
+    for line in data_lines:
+        data_array.append(txt2num(line))
+    data_array = np.array(data_array)
+    df = pd.DataFrame(data=data_array, columns=header)
+    df_datetime = pd.to_datetime([dt.fromtimestamp(i) for i in df['timestamp'].values])
+    df['datetime'] = df_datetime
+    df = df.set_index('datetime')
+    df = df.drop(columns=['timestamp'])
+    return df
+
+def concat_df(files):
+    df = create_df(files[0])
+    for file in files[1:]:
+        df_file = create_df(file)
+        df = pd.concat([df, df_file])
+    return df
+
 class Monitor(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -268,24 +303,7 @@ class Sensors:
         self.savefile = open(filename, 'w')
         self.savefile.write(self.header)
         self.savefile.close()
-    
-    def to_num(self, sample: str):
-        sample = sample.split(' ')
-        nums = []
-        i = 0
-        while i < 4:
-            try:
-                nums.append(float(sample[i]))
-            except ValueError:
-                nums.append(np.nan)
-            i += 1
-        while i < len(sample):
-            try:
-                nums.append(int(sample[i]))
-            except ValueError:
-                nums.append(np.nan)
-            i += 1
-        return nums
+
 
 if __name__ == '__main__':
     test = Monitor()
