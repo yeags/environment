@@ -17,7 +17,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-def txt2num(sample: str):
+def txt2num(sample: str) -> list:
     sample = sample.split(' ')
     nums = []
     for value in sample:
@@ -27,29 +27,26 @@ def txt2num(sample: str):
             nums.append(np.nan)
     return nums
 
-def create_df(filename: str) -> pd.DataFrame:
-    with open(filename) as file:
-        header = file.readline()
-        data = file.read()
-    
-    header = header[:-1].split(' ')
-    data_lines = data[:-1].split('\n')
-    data_array = []
-    for line in data_lines:
-        data_array.append(txt2num(line))
-    data_array = np.array(data_array)
-    df = pd.DataFrame(data=data_array, columns=header)
+def create_df(files: list) -> pd.DataFrame:
+    for i, file in enumerate(files):
+        if '.txt' not in file:
+            files.pop(i)
+    with open(files[0]) as f:
+        header = f.readline()
+        header = header[:-1].split(' ')
+    data = []
+    for file in files:
+        with open(file) as f:
+            f.readline()
+            contents = f.read()
+        lines = contents[:-1].split('\n')
+        for line in lines:
+            data.append(txt2num(line))
+    df = pd.DataFrame(data=data, columns=header)
     df_datetime = pd.to_datetime([dt.fromtimestamp(i) for i in df['timestamp'].values])
     df['datetime'] = df_datetime
     df = df.set_index('datetime')
     df = df.drop(columns=['timestamp'])
-    return df
-
-def concat_df(files):
-    df = create_df(files[0])
-    for file in files[1:]:
-        df_file = create_df(file)
-        df = pd.concat([df, df_file])
     return df
 
 class Monitor(tk.Tk):
@@ -220,6 +217,7 @@ class ReadArchive:
 
 class Sensors:
     def __init__(self):
+        self.data_folder = './data/'
         self.loop_counter = 0
         self.reset_threshold = 720
         self.sampling_delay = 5
@@ -265,7 +263,6 @@ class Sensors:
 
     def read_sensors(self):
         now = datetime.now()
-        # timestamp = datetime.fromtimestamp(now).strftime('%Y-%m-%d %H:%M:%S')
         temperature = self.bme280.temperature
         humidity = self.bme280.humidity
         pressure = self.bme280.pressure
@@ -299,7 +296,7 @@ class Sensors:
             self.loop_counter = 0
 
     def init_file(self, dt: datetime):
-        filename = './data/' + dt.strftime('%Y-%m-%d %H-%M-%S') + '.txt'
+        filename = self.data_folder + dt.strftime('%Y-%m-%d %H-%M-%S') + '.txt'
         self.savefile = open(filename, 'w')
         self.savefile.write(self.header)
         self.savefile.close()
