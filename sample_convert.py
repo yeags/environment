@@ -4,6 +4,7 @@ import os, sys
 from datetime import datetime as dt
 from datetime import timedelta
 import numpy as np
+from multiprocessing import Pool, Queue
 np.set_printoptions(suppress=True)
 
 def txt2num(sample: str):
@@ -75,4 +76,4 @@ if __name__ == '__main__':
     df = create_df(files)
     print(f'df size: {round(sys.getsizeof(df)/1024**2, 2)} MB')
     # print(df.resample('2W').mean())
-    print(df[df.index > dt.now() - timedelta(days=60)])
+    print(df[df.index > dt.now() - timedelta(days=60)].resample('D').mean())
