@@ -196,15 +196,15 @@ class ReadArchive:
         return df
 
     def cap_archive_list(self, files: list, limit='1h') -> list:
-        now = datetime.now()
         files_str = ' '.join(files)
         fn_list = re.findall(self.re_compile, files_str)
         fn_datetime = []
         filenames = []
         for fn in fn_list:
             fn_datetime.append(datetime.strptime(fn, self.fn_format))
+        recent_datetime = max(fn_datetime)
         for time in fn_datetime:
-            if time >= now - self.delta_dict[limit]:
+            if time >= recent_datetime - self.delta_dict[limit]:
                 filenames.append(time.strftime(self.fn_format) + '.txt')
         return filenames
 
