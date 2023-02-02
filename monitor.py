@@ -1,5 +1,5 @@
 from multiprocessing import Process, Queue
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import sleep
 import tkinter as tk
 from tkinter import ttk
@@ -17,43 +17,12 @@ try:
 except ModuleNotFoundError:
     pass
 
-def txt2num(sample: str) -> list:
-    sample = sample.split(' ')
-    nums = []
-    for value in sample:
-        try:
-            nums.append(float(value))
-        except ValueError:
-            nums.append(np.nan)
-    return nums
-
-def create_df(files: list) -> pd.DataFrame:
-    for i, file in enumerate(files):
-        if '.txt' not in file:
-            files.pop(i)
-    with open(files[0]) as f:
-        header = f.readline()
-        header = header[:-1].split(' ')
-    data = []
-    for file in files:
-        with open(file) as f:
-            f.readline()
-            contents = f.read()
-        lines = contents[:-1].split('\n')
-        for line in lines:
-            data.append(txt2num(line))
-    df = pd.DataFrame(data=data, columns=header)
-    df_datetime = pd.to_datetime([dt.fromtimestamp(i) for i in df['timestamp'].values])
-    df['datetime'] = df_datetime
-    df = df.set_index('datetime')
-    df = df.drop(columns=['timestamp'])
-    return df
-
 class Monitor(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.timestamp_delta = {'1h': 720, '8h': 5760, '24h': 17280, '7d': 120960,
-                                '1m': 518400, '6m': 3110400, '1y': 6307200}
+        self.archive = ReadArchive()
+        if 'board' in sys.modules:
+            self.sensor_daemon = Sensors()
         self.title('Environment Monitor')
         self.geometry('1280x1024')
         self.rowconfigure(0, weight=1)
@@ -186,34 +155,64 @@ class pmsFigure(tk.Frame):
         return (concentration, counts)
 
 class ReadArchive:
-    def __init__(self):
-        self.timespan_dict = {'1hr': slice(1, 1+1), '8hr': slice(1, 8+1), '24hr': slice(1, 24+1), '7d': slice(1, 168+1),
-                              '1m': slice(1, 720+1), '6m': slice(1, 4380+1), '1y': slice(1, 8760+1)}
+    def __init__(self, data_dir='./data/'):
+        self.data_dir = data_dir
         self.fn_format = '%Y-%m-%d %H-%M-%S'
         self.re_compile = re.compile(r'\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}')
+        self.delta_dict = {'1h': timedelta(hours=1), '8h': timedelta(hours=8), '24h': timedelta(hours=24),
+                           '7d': timedelta(days=7), '1m': timedelta(days=30), '6m': timedelta(days=90),
+                           '1y': timedelta(days=365)}
+    
+    def txt2num(self, sample: str) -> list:
+        sample = sample.split(' ')
+        nums = []
+        for value in sample:
+            try:
+                nums.append(float(value))
+            except ValueError:
+                nums.append(np.nan)
+        return nums
 
-    def read_files(self):
-        files = os.listdir('./data')
+    def create_df(self, files: list) -> pd.DataFrame:
+        for i, file in enumerate(files):
+            if '.txt' not in file:
+                files.pop(i)
+        with open(files[0]) as f:
+            header = f.readline()
+            header = header[:-1].split(' ')
+        data = []
+        for file in files:
+            with open(file) as f:
+                f.readline()
+                contents = f.read()
+            lines = contents[:-1].split('\n')
+            for line in lines:
+                data.append(self.txt2num(line))
+        df = pd.DataFrame(data=data, columns=header)
+        df_datetime = pd.to_datetime([datetime.fromtimestamp(i) for i in df['timestamp'].values])
+        df['datetime'] = df_datetime
+        df = df.set_index('datetime')
+        df = df.drop(columns=['timestamp'])
+        return df
+
+    def cap_archive_list(self, files: list, limit='1h') -> list:
+        now = datetime.now()
         files_str = ' '.join(files)
         fn_list = re.findall(self.re_compile, files_str)
-        fn_timestamp = []
+        fn_datetime = []
+        filenames = []
         for fn in fn_list:
-            fn_timestamp.append(datetime.strptime(fn, self.fn_format).timestamp())
-        self.fn_dict = dict(zip(fn_timestamp, fn_list))
-        self.timestamp_list = fn_timestamp.sort(reverse=True)
-    
-    def load_data(self, timespan = '1hr'):
-        data_fn = self.timestamp_list[self.timespan_dict[timespan]]
-        data_fn.sort()
-        contents_list = []
-        for file in data_fn:
-            with open('./data/'+file+'.txt') as f:
-                f.readline()
-                contents_list.append(f.read())
-        if len(contents_list) > 1:
-            contents = '\n'.join(contents_list)
-        else:
-            contents = contents_list[0]
+            fn_datetime.append(datetime.strptime(fn, self.fn_format))
+        for time in fn_datetime:
+            if time >= now - self.delta_dict[limit]:
+                filenames.append(time.strftime(self.fn_format) + '.txt')
+        return filenames
+
+    def load_data(self, timespan = '1hr') -> pd.DataFrame:
+        data_files = os.listdir(self.data_dir)
+        fn_delta = self.cap_archive_list(data_files, limit=timespan)
+        df = self.create_df(fn_delta)
+        return df
 
 class Sensors:
     def __init__(self):
@@ -230,7 +229,10 @@ class Sensors:
             self.pm25 = adafruit_pm25.PM25_UART(self.uart, self.reset_pin)
         except serial.SerialException:
             self.popup('Serial device not found.')
-        self.header = 'timestamp temperature humidity pressure pm10_standard pm25_standard pm100_standard pm10_env pm25_env pm100_env particles_03um particles_05um particles_10um particles_25um particles_50um particles_100um\n'
+        self.header = 'timestamp temperature humidity pressure \
+            pm10_standard pm25_standard pm100_standard pm10_env \
+            pm25_env pm100_env particles_03um particles_05um particles_10um \
+            particles_25um particles_50um particles_100um\n'
         self.nan_dict = {
             'pm10 standard': None,
             'pm25 standard': None,
