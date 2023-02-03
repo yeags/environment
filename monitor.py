@@ -58,16 +58,18 @@ class Monitor(tk.Tk):
         self.toolbar = tk.Frame(self.root_frame, bg='white')
         self.status_bar = ttk.Label(self.toolbar, text='*Status Window*',
             relief='sunken', width=40)
+        self.progress_bar = ttk.Progressbar(self.toolbar, orient='horizontal', mode='determinate', length=200)
         btn_realtime = ttk.Button(self.toolbar, text='Real-time', command=self.realtime)
-        btn_1hr = ttk.Button(self.toolbar, text='1 Hour', command=lambda: self.refresh_plots('1h'))
-        btn_8hr = ttk.Button(self.toolbar, text='8 Hours', command=lambda: self.refresh_plots('8h'))
-        btn_24hr = ttk.Button(self.toolbar, text='24 Hours', command=lambda: self.refresh_plots('24h'))
-        btn_7days = ttk.Button(self.toolbar, text='7 Days', command=lambda: self.refresh_plots('7d'))
-        btn_1month = ttk.Button(self.toolbar, text='1 Month', command=lambda: self.refresh_plots('1m'))
-        btn_6month = ttk.Button(self.toolbar, text='6 Month', command=lambda: self.refresh_plots('6m'))
-        btn_1year = ttk.Button(self.toolbar, text='1 Year', command=lambda: self.refresh_plots('1y'))
+        btn_1hr = ttk.Button(self.toolbar, text='1 Hour', command=lambda: self.refresh_plots('1h', self.progress_bar))
+        btn_8hr = ttk.Button(self.toolbar, text='8 Hours', command=lambda: self.refresh_plots('8h', self.progress_bar))
+        btn_24hr = ttk.Button(self.toolbar, text='24 Hours', command=lambda: self.refresh_plots('24h', self.progress_bar))
+        btn_7days = ttk.Button(self.toolbar, text='7 Days', command=lambda: self.refresh_plots('7d', self.progress_bar))
+        btn_1month = ttk.Button(self.toolbar, text='1 Month', command=lambda: self.refresh_plots('1m', self.progress_bar))
+        btn_6month = ttk.Button(self.toolbar, text='6 Month', command=lambda: self.refresh_plots('6m', self.progress_bar))
+        btn_1year = ttk.Button(self.toolbar, text='1 Year', command=lambda: self.refresh_plots('1y', self.progress_bar))
         btn_exit = ttk.Button(self.toolbar, text='Exit', command=self.close_app)
-        self.status_bar.grid(row=0, column=0, sticky='ew')
+        # self.status_bar.grid(row=0, column=0, sticky='ew')
+        self.progress_bar.grid(row=0, column=0, sticky='ew')
         btn_realtime.grid(row=0, column=1, padx=(10,5), sticky='w')
         btn_1hr.grid(row=0, column=2, padx=5, sticky='w')
         btn_8hr.grid(row=0, column=3, padx=5, sticky='w')
@@ -79,8 +81,11 @@ class Monitor(tk.Tk):
         btn_exit.grid(row=0, column=9, padx=5, sticky='e')
         self.toolbar.grid(row=2, column=0, sticky='ew')
     
-    def refresh_plots(self, time_window: str):
-        pass
+    def refresh_plots(self, timespan: str, pb_object: ttk.Progressbar):
+        data_files = os.listdir(self.archive.data_dir)
+        fn_delta = self.archive.cap_archive_list(data_files, limit=timespan)
+        df = self.archive.create_df(fn_delta, pb_object)
+        # return df
     
     def realtime(self):
         pass
@@ -173,21 +178,24 @@ class ReadArchive:
                 nums.append(np.nan)
         return nums
 
-    def create_df(self, files: list) -> pd.DataFrame:
+    def create_df(self, files: list, progress_object: ttk.Progressbar) -> pd.DataFrame:
         for i, file in enumerate(files):
             if '.txt' not in file:
                 files.pop(i)
-        with open(files[0]) as f:
+        progress_object.configure(maximum=len(files))
+        with open(self.data_dir + files[0]) as f:
             header = f.readline()
             header = header[:-1].split(' ')
         data = []
         for file in files:
-            with open(file) as f:
+            with open(self.data_dir + file) as f:
                 f.readline()
                 contents = f.read()
             lines = contents[:-1].split('\n')
             for line in lines:
-                data.append(self.txt2num(line))
+                data.append(self.txt2num(line[:-1]))
+            progress_object.step()
+            progress_object.update()
         df = pd.DataFrame(data=data, columns=header)
         df_datetime = pd.to_datetime([datetime.fromtimestamp(i) for i in df['timestamp'].values])
         df['datetime'] = df_datetime
@@ -207,12 +215,6 @@ class ReadArchive:
             if time >= recent_datetime - self.delta_dict[limit]:
                 filenames.append(time.strftime(self.fn_format) + '.txt')
         return filenames
-
-    def load_data(self, timespan = '1hr') -> pd.DataFrame:
-        data_files = os.listdir(self.data_dir)
-        fn_delta = self.cap_archive_list(data_files, limit=timespan)
-        df = self.create_df(fn_delta)
-        return df
 
 class Sensors:
     def __init__(self):
