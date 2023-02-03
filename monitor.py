@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.ticker import FixedLocator
 import serial
 import os, re, sys
 # Raspberry Pi specific libraries below
@@ -35,12 +36,6 @@ class Monitor(tk.Tk):
         self.create_thp_plot()
         self.create_pms_plot()
         self.create_toolbar()
-    
-    def __lsdir__(self):
-        pattern = re.compile(r'\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}\.txt')
-        files = os.listdir('./data')
-        data_fn = re.findall(pattern, ' '.join(files))
-        return data_fn
     
     def close_app(self):
         self.destroy()
@@ -85,7 +80,26 @@ class Monitor(tk.Tk):
         data_files = os.listdir(self.archive.data_dir)
         fn_delta = self.archive.cap_archive_list(data_files, limit=timespan)
         df = self.archive.create_df(fn_delta, pb_object)
-        # return df
+        self.plot_data = df
+        self.thp_figure.th.cla()
+        self.thp_figure.th2.cla()
+        self.thp_figure.p.cla()
+        self.thp_figure.reset_thp()
+        self.thp_figure.th.plot(self.plot_data.index, self.plot_data['temperature'], color='C0', label='temperature')
+        self.thp_figure.th2.plot(self.plot_data.index, self.plot_data['humidity'], color='C1', label='humidity')
+        self.thp_figure.p.plot(self.plot_data.index, self.plot_data['pressure'], color='C2', label='pressure')
+        # self.thp_figure.th.tick_params(axis='x', labelbottom='off')
+        # self.thp_figure.th2.tick_params(axis='x', labelbottom='off')
+        # self.thp_figure.th.xaxis.set_ticklabels([])
+        # self.thp_figure.th2.xaxis.set_ticklabels([])
+        # self.thp_figure.th.set_xticks([])
+        # self.thp_figure.th2.set_xticks([])
+        t_lim = self.thp_figure.th.get_ylim()
+        h_lim = self.thp_figure.th2.get_ylim()
+        lim_func = lambda x: h_lim[0] + (x - t_lim[0]) / (t_lim[1] - t_lim[0]) * (h_lim[1] - h_lim[0])
+        ticks = lim_func(self.thp_figure.th.get_yticks())
+        self.thp_figure.th2.yaxis.set_major_locator(FixedLocator(ticks))
+        self.thp_figure.thp_plot.draw()
     
     def realtime(self):
         pass
@@ -104,18 +118,39 @@ class thpFigure(tk.Frame):
         self.fig, (self.th, self.p) = plt.subplots(nrows=2, ncols=1, sharex=True,
             figsize=(1280 / self.screen_dpi, 500 / self.screen_dpi),
             dpi=self.screen_dpi)
+        self.fig.autofmt_xdate()
         self.thp_plot = FigureCanvasTkAgg(self.fig, master=self)
-        th2 = self.th.twinx()
+        self.th2 = self.th.twinx()
         # Configure subplots
         self.th.set_title('Temperature | Humidity')
         self.th.set_ylabel('Temperature [$^\circ$C]', color='C0')
         self.p.set_xlabel('Date', loc='left')
-        th2.set_ylabel('Humidity [%RH]', color='C1')
+        self.th2.set_ylabel('Humidity [%RH]', color='C1')
+        self.th.grid()
+        # self.th.tick_params(axis='x', labelbottom='off')
+        # self.th2.tick_params(axis='x', labelbottom='off')
+        # self.th.xaxis.set_ticklabels([])
+        # self.th2.xaxis.set_ticklabels([])
+        self.p.set_title('Pressure')
+        self.p.set_ylabel('Pressure [mBar]', color='C2')
+        self.p.grid()
+        t_lim = self.th.get_ylim()
+        h_lim = self.th2.get_ylim()
+        lim_func = lambda x: h_lim[0] + (x - t_lim[0] / (t_lim[1] - t_lim[0]) * (h_lim[1] - h_lim[0]))
+        ticks = lim_func(self.th.get_yticks())
+        self.th2.yaxis.set_major_locator(FixedLocator(ticks))
+        self.thp_plot.draw()
+    
+    def reset_thp(self):
+        self.th.set_title('Temperature | Humidity')
+        self.th.set_ylabel('Temperature [$^\circ$C]', color='C0')
+        self.p.set_xlabel('Date', loc='left')
+        self.th2.set_ylabel('Humidity [%RH]', color='C1')
+        self.th2.yaxis.tick_right()
         self.th.grid()
         self.p.set_title('Pressure')
         self.p.set_ylabel('Pressure [mBar]', color='C2')
         self.p.grid()
-        self.thp_plot.draw()
     
     def update_plot(self, data):
         pass
