@@ -88,17 +88,13 @@ class Monitor(tk.Tk):
         self.thp_figure.th.plot(self.plot_data.index, self.plot_data['temperature'], color='C0', label='temperature')
         self.thp_figure.th2.plot(self.plot_data.index, self.plot_data['humidity'], color='C1', label='humidity')
         self.thp_figure.p.plot(self.plot_data.index, self.plot_data['pressure'], color='C2', label='pressure')
-        # self.thp_figure.th.tick_params(axis='x', labelbottom='off')
-        # self.thp_figure.th2.tick_params(axis='x', labelbottom='off')
-        # self.thp_figure.th.xaxis.set_ticklabels([])
-        # self.thp_figure.th2.xaxis.set_ticklabels([])
-        # self.thp_figure.th.set_xticks([])
-        # self.thp_figure.th2.set_xticks([])
+        # align temperature and humidity y ticks
         t_lim = self.thp_figure.th.get_ylim()
         h_lim = self.thp_figure.th2.get_ylim()
         lim_func = lambda x: h_lim[0] + (x - t_lim[0]) / (t_lim[1] - t_lim[0]) * (h_lim[1] - h_lim[0])
         ticks = lim_func(self.thp_figure.th.get_yticks())
         self.thp_figure.th2.yaxis.set_major_locator(FixedLocator(ticks))
+        # re-draw plots
         self.thp_figure.thp_plot.draw()
     
     def realtime(self):
@@ -127,10 +123,6 @@ class thpFigure(tk.Frame):
         self.p.set_xlabel('Date', loc='left')
         self.th2.set_ylabel('Humidity [%RH]', color='C1')
         self.th.grid()
-        # self.th.tick_params(axis='x', labelbottom='off')
-        # self.th2.tick_params(axis='x', labelbottom='off')
-        # self.th.xaxis.set_ticklabels([])
-        # self.th2.xaxis.set_ticklabels([])
         self.p.set_title('Pressure')
         self.p.set_ylabel('Pressure [mBar]', color='C2')
         self.p.grid()
