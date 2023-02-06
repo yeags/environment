@@ -114,7 +114,7 @@ class thpFigure(tk.Frame):
         self.fig, (self.th, self.p) = plt.subplots(nrows=2, ncols=1, sharex=True,
             figsize=(1280 / self.screen_dpi, 500 / self.screen_dpi),
             dpi=self.screen_dpi)
-        self.fig.autofmt_xdate()
+        # self.fig.autofmt_xdate()
         self.thp_plot = FigureCanvasTkAgg(self.fig, master=self)
         self.th2 = self.th.twinx()
         # Configure subplots
@@ -128,7 +128,7 @@ class thpFigure(tk.Frame):
         self.p.grid()
         t_lim = self.th.get_ylim()
         h_lim = self.th2.get_ylim()
-        lim_func = lambda x: h_lim[0] + (x - t_lim[0] / (t_lim[1] - t_lim[0]) * (h_lim[1] - h_lim[0]))
+        lim_func = lambda x: h_lim[0] + (x - t_lim[0]) / (t_lim[1] - t_lim[0]) * (h_lim[1] - h_lim[0])
         ticks = lim_func(self.th.get_yticks())
         self.th2.yaxis.set_major_locator(FixedLocator(ticks))
         self.thp_plot.draw()
