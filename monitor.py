@@ -144,9 +144,6 @@ class thpFigure(tk.Frame):
         self.p.set_ylabel('Pressure [mBar]', color='C2')
         self.p.grid()
     
-    def update_plot(self, data):
-        pass
-
 class pmsFigure(tk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
@@ -170,7 +167,7 @@ class pmsFigure(tk.Frame):
         self.pms_concentration.set_xlabel('Particle Size [$\mu$m]')
         self.pms_counts.set_title('Particle Counts')
         self.pms_counts.set_yscale('log')
-        self.pms_counts.set_ylabel('Quantity')
+        self.pms_counts.set_ylabel('Quantity per dL Air')
         self.pms_counts.set_xlabel('Particle Size [$\mu$m]')
         self.fig.subplots_adjust(bottom=0.1, top=0.95)
         self.pms_plot.draw()
