@@ -77,17 +77,24 @@ class Monitor(tk.Tk):
         self.toolbar.grid(row=2, column=0, sticky='ew')
     
     def refresh_plots(self, timespan: str, pb_object: ttk.Progressbar):
+        resample_dict = {'1h': '5T', '8h': '20T', '24h': 'H',
+                         '7d': 'H', '1m': 'D', '6m': 'D',
+                         '1y': 'W'}
         data_files = os.listdir(self.archive.data_dir)
         fn_delta = self.archive.cap_archive_list(data_files, limit=timespan)
-        df = self.archive.create_df(fn_delta, pb_object)
-        self.plot_data = df
+        self.plot_data = self.archive.create_df(fn_delta, pb_object)
+        # Clear and reset figures
         self.thp_figure.th.cla()
         self.thp_figure.th2.cla()
         self.thp_figure.p.cla()
         self.thp_figure.reset_thp()
+        # Plot temperature, humidity, pressure
         self.thp_figure.th.plot(self.plot_data.index, self.plot_data['temperature'], color='C0', label='temperature')
         self.thp_figure.th2.plot(self.plot_data.index, self.plot_data['humidity'], color='C1', label='humidity')
         self.thp_figure.p.plot(self.plot_data.index, self.plot_data['pressure'], color='C2', label='pressure')
+        # Plot particle data
+        self.plot_data = self.plot_data.resample(resample_dict[timespan])
+        self.pms_figure.pms_plot.pms_concentration.errorbar(self.plot_data)
         # align temperature and humidity y ticks
         t_lim = self.thp_figure.th.get_ylim()
         h_lim = self.thp_figure.th2.get_ylim()
@@ -155,9 +162,10 @@ class pmsFigure(tk.Frame):
         self.pms_plot.get_tk_widget().grid(row=0, column=0, sticky='nsew')
     
     def create_figure(self):
-        self.fig, (self.pms_concentration, self.pms_counts) = plt.subplots(nrows=1, ncols=2,
+        self.fig, (self.pms_concentration, self.pms_counts) = plt.subplots(nrows=2, ncols=1,
             figsize=(1280 / self.screen_dpi, 500 / self.screen_dpi),
             dpi=self.screen_dpi)
+        self.fig.subplots_adjust(hspace=0.5)
         self.pms_plot = FigureCanvasTkAgg(self.fig, master=self)
         concentration, counts = self.generate_data()
         self.pms_concentration.bar(concentration.keys(), concentration.values())
