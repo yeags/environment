@@ -23,7 +23,9 @@ class Monitor(tk.Tk):
     def __init__(self):
         super().__init__()
         self.archive = ReadArchive()
+        self.sensor_active = False
         if 'board' in sys.modules:
+            self.sensor_active = True
             self.sensor_daemon = Sensors()
         self.title('Environment Monitor')
         self.geometry('1280x1024')
@@ -39,6 +41,8 @@ class Monitor(tk.Tk):
         self.create_toolbar()
     
     def close_app(self):
+        if self.sensor_active:
+            self.sensor_daemon.stop_daemon()
         self.destroy()
         sys.exit()
 
@@ -82,6 +86,13 @@ class Monitor(tk.Tk):
     def daterange(self):
         pass
     
+    def clear_plots(self):
+        self.thp_figure.th.cla()
+        self.thp_figure.th2.cla()
+        self.thp_figure.p.cla()
+        self.pms_figure.pms_concentration.cla()
+        self.pms_figure.pms_counts.cla()
+    
     def refresh_plots(self, timespan: str, pb_object: ttk.Progressbar):
         resample_dict = {'1h': '5T', '8h': '20T', '24h': 'H',
                          '7d': 'H', '1m': 'D', '6m': 'D',
@@ -89,12 +100,8 @@ class Monitor(tk.Tk):
         data_files = os.listdir(self.archive.data_dir)
         fn_delta = self.archive.cap_archive_list(data_files, limit=timespan)
         self.plot_data = self.archive.create_df(fn_delta, pb_object)
-        # Clear figures
-        self.thp_figure.th.cla()
-        self.thp_figure.th2.cla()
-        self.thp_figure.p.cla()
-        self.pms_figure.pms_concentration.cla()
-        self.pms_figure.pms_counts.cla()
+        # Clear plots
+        self.clear_plots()
         # Plot temperature, humidity, pressure
         self.thp_figure.th.plot(self.plot_data.index, self.plot_data['temperature'], color='C0', label='temperature')
         self.thp_figure.th2.plot(self.plot_data.index, self.plot_data['humidity'], color='C1', label='humidity')
@@ -104,12 +111,15 @@ class Monitor(tk.Tk):
         self.pms_figure.pms_concentration.plot(self.plot_data_rs.index, self.plot_data_rs['pm10_standard'], label='1.0 $\mu$m')
         self.pms_figure.pms_concentration.plot(self.plot_data_rs.index, self.plot_data_rs['pm25_standard'], label='2.5 $\mu$m')
         self.pms_figure.pms_concentration.plot(self.plot_data_rs.index, self.plot_data_rs['pm100_standard'], label='10.0 $\mu$m')
-        self.pms_figure.pms_counts.scatter(self.plot_data_rs.index, self.plot_data_rs['particles_03um'], label='0.3 $\mu$m')
-        self.pms_figure.pms_counts.scatter(self.plot_data_rs.index, self.plot_data_rs['particles_05um'], label='0.5 $\mu$m')
-        self.pms_figure.pms_counts.scatter(self.plot_data_rs.index, self.plot_data_rs['particles_10um'], label='1.0 $\mu$m')
-        self.pms_figure.pms_counts.scatter(self.plot_data_rs.index, self.plot_data_rs['particles_25um'], label='2.5 $\mu$m')
-        self.pms_figure.pms_counts.scatter(self.plot_data_rs.index, self.plot_data_rs['particles_50um'], label='5.0 $\mu$m')
-        self.pms_figure.pms_counts.scatter(self.plot_data_rs.index, self.plot_data_rs['particles_100um'], label='10.0 $\mu$m')
+        self.pms_figure.pms_counts.plot(self.plot_data_rs.index, self.plot_data_rs['particles_03um'], label='0.3 $\mu$m')
+        self.pms_figure.pms_counts.plot(self.plot_data_rs.index, self.plot_data_rs['particles_05um'], label='0.5 $\mu$m')
+        self.pms_figure.pms_counts.plot(self.plot_data_rs.index, self.plot_data_rs['particles_10um'], label='1.0 $\mu$m')
+        self.pms_figure.pms_counts.plot(self.plot_data_rs.index, self.plot_data_rs['particles_25um'], label='2.5 $\mu$m')
+        self.pms_figure.pms_counts.plot(self.plot_data_rs.index, self.plot_data_rs['particles_50um'], label='5.0 $\mu$m')
+        self.pms_figure.pms_counts.plot(self.plot_data_rs.index, self.plot_data_rs['particles_100um'], label='10.0 $\mu$m')
+        self.reset_figures()
+    
+    def reset_figures(self):
         # Reset figures
         self.thp_figure.reset_thp()
         self.pms_figure.reset_pms()
@@ -124,7 +134,24 @@ class Monitor(tk.Tk):
         self.pms_figure.pms_plot.draw()
     
     def realtime(self):
-        pass
+        if self.sensor_active:
+            self.clear_plots()
+            sample = ReadArchive.txt2num(self.sensor_daemon.sampling_buffer.get())
+            self.thp_figure.th.plot(datetime.fromtimestamp(sample[0]), sample[1], color='C0', label='temperature')
+            self.thp_figure.th2.plot(datetime.fromtimestamp(sample[0]), sample[2], color='C1', label='humidity')
+            self.thp_figure.p.plot(datetime.fromtimestamp(sample[0]), sample[3], color='C2', label='pressure')
+            self.pms_figure.pms_concentration.plot(datetime.fromtimestamp(sample[0]), sample[4], label='1.0 $\mu$m')
+            self.pms_figure.pms_concentration.plot(datetime.fromtimestamp(sample[0]), sample[5], label='2.5 $\mu$m')
+            self.pms_figure.pms_concentration.plot(datetime.fromtimestamp(sample[0]), sample[6], label='10.0 $\mu$m')
+            self.pms_figure.pms_counts.plot(datetime.fromtimestamp(sample[0]), sample[7], label='0.3 $\mu$m')
+            self.pms_figure.pms_counts.plot(datetime.fromtimestamp(sample[0]), sample[8], label='0.5 $\mu$m')
+            self.pms_figure.pms_counts.plot(datetime.fromtimestamp(sample[0]), sample[9], label='1.0 $\mu$m')
+            self.pms_figure.pms_counts.plot(datetime.fromtimestamp(sample[0]), sample[10], label='2.5 $\mu$m')
+            self.pms_figure.pms_counts.plot(datetime.fromtimestamp(sample[0]), sample[11], label='5.0 $\mu$m')
+            self.pms_figure.pms_counts.plot(datetime.fromtimestamp(sample[0]), sample[12], label='10.0 $\mu$m')
+            self.reset_figures()
+        else:
+            pass
 
 
 class thpFigure(tk.Frame):
@@ -263,6 +290,11 @@ class ReadArchive:
         df = df.set_index('datetime')
         df = df.drop(columns=['timestamp'])
         df = df.dropna()
+        df['particles_03um'] = df['particles_03um'] - df['particles_05um']
+        df['particles_05um'] = df['particles_05um'] - df['particles_10um']
+        df['particles_10um'] = df['particles_10um'] - df['particles_25um']
+        df['particles_25um'] = df['particles_25um'] - df['particles_50um']
+        df['particles_50um'] = df['particles_50um'] - df['particles_100um']
         return df
 
     def cap_archive_list(self, files: list, limit='1h') -> list:
@@ -318,6 +350,10 @@ class Sensors:
         self.daemon = Process(target=self.start_loop)
         self.daemon.start()
     
+    def stop_daemon(self):
+        self.daemon_status = False
+        self.daemon.join()
+    
     def popup(msg):
         popup = tk.Tk()
         popup.wm_title("!")
@@ -327,7 +363,7 @@ class Sensors:
         B1.pack()
         popup.mainloop()
 
-    def read_sensors(self):
+    def read_sensors(self) -> str:
         now = datetime.now()
         temperature = self.bme280.temperature
         humidity = self.bme280.humidity
