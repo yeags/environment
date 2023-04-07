@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.ticker import FixedLocator
+from matplotlib.transforms import Bbox
 import serial
 import os, re, sys
 # Raspberry Pi specific libraries below
@@ -55,6 +56,7 @@ class Monitor(tk.Tk):
             relief='sunken', width=40)
         self.progress_bar = ttk.Progressbar(self.toolbar, orient='horizontal', mode='determinate', length=200)
         btn_realtime = ttk.Button(self.toolbar, text='Real-time', command=self.realtime)
+        btn_daterange = ttk.Button(self.toolbar, text='Date Range', command=self.daterange)
         btn_1hr = ttk.Button(self.toolbar, text='1 Hour', command=lambda: self.refresh_plots('1h', self.progress_bar))
         btn_8hr = ttk.Button(self.toolbar, text='8 Hours', command=lambda: self.refresh_plots('8h', self.progress_bar))
         btn_24hr = ttk.Button(self.toolbar, text='24 Hours', command=lambda: self.refresh_plots('24h', self.progress_bar))
@@ -66,15 +68,19 @@ class Monitor(tk.Tk):
         # self.status_bar.grid(row=0, column=0, sticky='ew')
         self.progress_bar.grid(row=0, column=0, sticky='ew')
         btn_realtime.grid(row=0, column=1, padx=(10,5), sticky='w')
-        btn_1hr.grid(row=0, column=2, padx=5, sticky='w')
-        btn_8hr.grid(row=0, column=3, padx=5, sticky='w')
-        btn_24hr.grid(row=0, column=4, padx=5, sticky='w')
-        btn_7days.grid(row=0, column=5, padx=5, sticky='w')
-        btn_1month.grid(row=0, column=6, padx=5, sticky='w')
-        btn_6month.grid(row=0, column=7, padx=5, sticky='w')
-        btn_1year.grid(row=0, column=8, padx=5, sticky='w')
-        btn_exit.grid(row=0, column=9, padx=5, sticky='e')
+        btn_daterange.grid(row=0, column=2, padx=5, sticky='w')
+        btn_1hr.grid(row=0, column=3, padx=5, sticky='w')
+        btn_8hr.grid(row=0, column=4, padx=5, sticky='w')
+        btn_24hr.grid(row=0, column=5, padx=5, sticky='w')
+        btn_7days.grid(row=0, column=6, padx=5, sticky='w')
+        btn_1month.grid(row=0, column=7, padx=5, sticky='w')
+        btn_6month.grid(row=0, column=8, padx=5, sticky='w')
+        btn_1year.grid(row=0, column=9, padx=5, sticky='w')
+        btn_exit.grid(row=0, column=10, padx=5, sticky='e')
         self.toolbar.grid(row=2, column=0, sticky='ew')
+    
+    def daterange(self):
+        pass
     
     def refresh_plots(self, timespan: str, pb_object: ttk.Progressbar):
         resample_dict = {'1h': '5T', '8h': '20T', '24h': 'H',
@@ -83,18 +89,30 @@ class Monitor(tk.Tk):
         data_files = os.listdir(self.archive.data_dir)
         fn_delta = self.archive.cap_archive_list(data_files, limit=timespan)
         self.plot_data = self.archive.create_df(fn_delta, pb_object)
-        # Clear and reset figures
+        # Clear figures
         self.thp_figure.th.cla()
         self.thp_figure.th2.cla()
         self.thp_figure.p.cla()
-        self.thp_figure.reset_thp()
+        self.pms_figure.pms_concentration.cla()
+        self.pms_figure.pms_counts.cla()
         # Plot temperature, humidity, pressure
         self.thp_figure.th.plot(self.plot_data.index, self.plot_data['temperature'], color='C0', label='temperature')
         self.thp_figure.th2.plot(self.plot_data.index, self.plot_data['humidity'], color='C1', label='humidity')
         self.thp_figure.p.plot(self.plot_data.index, self.plot_data['pressure'], color='C2', label='pressure')
         # Plot particle data
-        self.plot_data = self.plot_data.resample(resample_dict[timespan])
-        self.pms_figure.pms_plot.pms_concentration.errorbar(self.plot_data)
+        self.plot_data_rs = self.plot_data.resample(resample_dict[timespan]).mean()
+        self.pms_figure.pms_concentration.plot(self.plot_data_rs.index, self.plot_data_rs['pm10_standard'], label='1.0 $\mu$m')
+        self.pms_figure.pms_concentration.plot(self.plot_data_rs.index, self.plot_data_rs['pm25_standard'], label='2.5 $\mu$m')
+        self.pms_figure.pms_concentration.plot(self.plot_data_rs.index, self.plot_data_rs['pm100_standard'], label='10.0 $\mu$m')
+        self.pms_figure.pms_counts.scatter(self.plot_data_rs.index, self.plot_data_rs['particles_03um'], label='0.3 $\mu$m')
+        self.pms_figure.pms_counts.scatter(self.plot_data_rs.index, self.plot_data_rs['particles_05um'], label='0.5 $\mu$m')
+        self.pms_figure.pms_counts.scatter(self.plot_data_rs.index, self.plot_data_rs['particles_10um'], label='1.0 $\mu$m')
+        self.pms_figure.pms_counts.scatter(self.plot_data_rs.index, self.plot_data_rs['particles_25um'], label='2.5 $\mu$m')
+        self.pms_figure.pms_counts.scatter(self.plot_data_rs.index, self.plot_data_rs['particles_50um'], label='5.0 $\mu$m')
+        self.pms_figure.pms_counts.scatter(self.plot_data_rs.index, self.plot_data_rs['particles_100um'], label='10.0 $\mu$m')
+        # Reset figures
+        self.thp_figure.reset_thp()
+        self.pms_figure.reset_pms()
         # align temperature and humidity y ticks
         t_lim = self.thp_figure.th.get_ylim()
         h_lim = self.thp_figure.th2.get_ylim()
@@ -103,6 +121,7 @@ class Monitor(tk.Tk):
         self.thp_figure.th2.yaxis.set_major_locator(FixedLocator(ticks))
         # re-draw plots
         self.thp_figure.thp_plot.draw()
+        self.pms_figure.pms_plot.draw()
     
     def realtime(self):
         pass
@@ -167,9 +186,10 @@ class pmsFigure(tk.Frame):
             dpi=self.screen_dpi)
         self.fig.subplots_adjust(hspace=0.5)
         self.pms_plot = FigureCanvasTkAgg(self.fig, master=self)
-        concentration, counts = self.generate_data()
-        self.pms_concentration.bar(concentration.keys(), concentration.values())
-        self.pms_counts.bar(counts.keys(), counts.values())
+        # self.pms_concentration.bar(concentration.keys(), concentration.values())
+        # self.pms_counts.bar(counts.keys(), counts.values())
+        self.pms_concentration.plot([1,2,3,4], [2,3,4,5])
+        self.pms_counts.scatter([1,2,3,4], [2,3,4,5])
         self.pms_concentration.set_title('Particle Concentration')
         self.pms_concentration.set_ylabel('$\mu$g/m$^3$')
         self.pms_concentration.set_xlabel('Particle Size [$\mu$m]')
@@ -180,16 +200,25 @@ class pmsFigure(tk.Frame):
         self.fig.subplots_adjust(bottom=0.1, top=0.95)
         self.pms_plot.draw()
     
-    def update_plot(self, data):
-        pass
-
-    def generate_data(self):
-        """
-        This function is for sandboxing only.  Will be removed in the future.
-        """
-        concentration = {'1.0': 234, '2.5': 45, '10.0': 22}
-        counts = dict(zip(self.particle_sizes, [2500, 855, 127, 50, 8, 2]))
-        return (concentration, counts)
+    def reset_pms(self):
+        # Reset concentration figure
+        self.pms_concentration.set_title('Particle Concentration')
+        self.pms_counts.set_title('Particle Counts')
+        self.pms_concentration.set_ylabel('$\mu$g/m$^3$')
+        self.pms_concentration.set_xlabel('Date', loc='left')
+        self.pms_concentration.grid()
+        self.pms_concentration.legend()
+        # Reset counts figure
+        self.pms_counts.set_title('Particle Counts')
+        self.pms_counts.set_yscale('log')
+        self.pms_counts.set_ylabel('Quantity per dL Air')
+        self.pms_counts.set_xlabel('Date', loc='left')
+        self.pms_counts.grid()
+        # self.pms_counts.legend()
+        # pos = self.pms_counts.get_position()
+        pos = Bbox([[0.125, 0.1], [0.9, 0.44]])
+        self.pms_counts.set_position([pos.x0, pos.y0, pos.width * 0.95, pos.height])
+        self.pms_counts.legend(loc='center right', bbox_to_anchor=(1.125, 0.5))
 
 class ReadArchive:
     def __init__(self, data_dir='./data/'):
@@ -233,6 +262,7 @@ class ReadArchive:
         df['datetime'] = df_datetime
         df = df.set_index('datetime')
         df = df.drop(columns=['timestamp'])
+        df = df.dropna()
         return df
 
     def cap_archive_list(self, files: list, limit='1h') -> list:
