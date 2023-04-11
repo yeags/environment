@@ -24,6 +24,7 @@ class Monitor(tk.Tk):
         super().__init__()
         self.archive = ReadArchive()
         self.sensor_active = False
+        self.realtime_active = Queue()
         if 'board' in sys.modules:
             self.sensor_active = True
             self.sensor_daemon = Sensors()
@@ -43,6 +44,10 @@ class Monitor(tk.Tk):
     def close_app(self):
         if self.sensor_active:
             self.sensor_daemon.stop_daemon()
+            try:
+                self.stop_realtime_process()
+            except:
+                pass
         self.destroy()
         sys.exit()
 
@@ -59,8 +64,8 @@ class Monitor(tk.Tk):
         self.status_bar = ttk.Label(self.toolbar, text='*Status Window*',
             relief='sunken', width=40)
         self.progress_bar = ttk.Progressbar(self.toolbar, orient='horizontal', mode='determinate', length=200)
-        btn_realtime = ttk.Button(self.toolbar, text='Real-time', command=self.realtime)
-        btn_daterange = ttk.Button(self.toolbar, text='Date Range', command=self.daterange)
+        btn_realtime = ttk.Button(self.toolbar, text='Real-time', command=self.start_realtime_process)
+        btn_daterange = ttk.Button(self.toolbar, text='Date Range', command=self.daterange, state='disabled') #Re-enable once daterange is implemented
         btn_1hr = ttk.Button(self.toolbar, text='1 Hour', command=lambda: self.refresh_plots('1h', self.progress_bar))
         btn_8hr = ttk.Button(self.toolbar, text='8 Hours', command=lambda: self.refresh_plots('8h', self.progress_bar))
         btn_24hr = ttk.Button(self.toolbar, text='24 Hours', command=lambda: self.refresh_plots('24h', self.progress_bar))
@@ -134,25 +139,42 @@ class Monitor(tk.Tk):
         self.pms_figure.pms_plot.draw()
     
     def realtime(self):
+        buffer = []
         if self.sensor_active:
-            self.clear_plots()
-            sample = ReadArchive.txt2num(self.sensor_daemon.sampling_buffer.get())
-            self.thp_figure.th.plot(datetime.fromtimestamp(sample[0]), sample[1], color='C0', label='temperature')
-            self.thp_figure.th2.plot(datetime.fromtimestamp(sample[0]), sample[2], color='C1', label='humidity')
-            self.thp_figure.p.plot(datetime.fromtimestamp(sample[0]), sample[3], color='C2', label='pressure')
-            self.pms_figure.pms_concentration.plot(datetime.fromtimestamp(sample[0]), sample[4], label='1.0 $\mu$m')
-            self.pms_figure.pms_concentration.plot(datetime.fromtimestamp(sample[0]), sample[5], label='2.5 $\mu$m')
-            self.pms_figure.pms_concentration.plot(datetime.fromtimestamp(sample[0]), sample[6], label='10.0 $\mu$m')
-            self.pms_figure.pms_counts.plot(datetime.fromtimestamp(sample[0]), sample[7], label='0.3 $\mu$m')
-            self.pms_figure.pms_counts.plot(datetime.fromtimestamp(sample[0]), sample[8], label='0.5 $\mu$m')
-            self.pms_figure.pms_counts.plot(datetime.fromtimestamp(sample[0]), sample[9], label='1.0 $\mu$m')
-            self.pms_figure.pms_counts.plot(datetime.fromtimestamp(sample[0]), sample[10], label='2.5 $\mu$m')
-            self.pms_figure.pms_counts.plot(datetime.fromtimestamp(sample[0]), sample[11], label='5.0 $\mu$m')
-            self.pms_figure.pms_counts.plot(datetime.fromtimestamp(sample[0]), sample[12], label='10.0 $\mu$m')
-            self.reset_figures()
+            rta = True
+            while rta:
+                num_buffer = self.sensor_daemon.sampling_buffer.qsize()
+                for i in range(num_buffer):
+                    buffer.append(ReadArchive.txt2num(self.sensor_daemon.sampling_buffer.get()))
+                self.clear_plots()
+                dt = [datetime.fromtimestamp(i[0]) for i in buffer]
+                self.thp_figure.th.plot(dt, [j[1] for j in buffer], color='C0', label='temperature')
+                self.thp_figure.th2.plot(dt, [j[2] for j in buffer], color='C1', label='humidity')
+                self.thp_figure.p.plot(dt, [j[3] for j in buffer], color='C2', label='pressure')
+                self.pms_figure.pms_concentration.plot(dt, [j[4] for j in buffer], label='1.0 $\mu$m')
+                self.pms_figure.pms_concentration.plot(dt, [j[5] for j in buffer], label='2.5 $\mu$m')
+                self.pms_figure.pms_concentration.plot(dt, [j[6] for j in buffer], label='10.0 $\mu$m')
+                self.pms_figure.pms_counts.plot(dt, [j[7] for j in buffer], label='0.3 $\mu$m')
+                self.pms_figure.pms_counts.plot(dt, [j[8] for j in buffer], label='0.5 $\mu$m')
+                self.pms_figure.pms_counts.plot(dt, [j[9] for j in buffer], label='1.0 $\mu$m')
+                self.pms_figure.pms_counts.plot(dt, [j[10] for j in buffer], label='2.5 $\mu$m')
+                self.pms_figure.pms_counts.plot(dt, [j[11] for j in buffer], label='5.0 $\mu$m')
+                self.pms_figure.pms_counts.plot(dt, [j[12] for j in buffer], label='10.0 $\mu$m')
+                self.reset_figures()
+                sleep(self.sensor_daemon.sampling_interval)
+                if self.realtime_active.qsize() > 0:
+                    self.realtime_active.get()
+                    rta = False
         else:
             pass
-
+    
+    def start_realtime_process(self):
+        if self.sensor_active:
+            self.realtime_process = Process(target=self.realtime)
+            self.realtime_process.start()
+    
+    def stop_realtime_process(self):
+        self.realtime_process.terminate()
 
 class thpFigure(tk.Frame):
     def __init__(self, parent):
