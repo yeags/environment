@@ -4,6 +4,7 @@ from archive import ReadArchive
 from sensors import Sensors
 import sys, os
 from multiprocessing import Process, Queue
+from threading import Thread
 from datetime import datetime
 from time import sleep
 import matplotlib.pyplot as plt
@@ -51,6 +52,14 @@ class Monitor(tk.Tk):
         self.pms_figure = pmsFigure(self.root_frame)
         self.pms_figure.grid(row=1, column=0, sticky='nsew')
     
+    def refresh_plots_thread(self, time_range):
+        self.progress_bar.start()
+        # Refresh plots in a separate thread to prevent GUI from freezing
+        self.status_bar.config(text='Refreshing plots...')
+        self.refresh_plots(time_range)
+        self.status_bar.config(text='*Status Window*')
+        self.progress_bar.stop()
+    
     def create_toolbar(self):
         self.toolbar = tk.Frame(self.root_frame, bg='white')
         self.status_bar = ttk.Label(self.toolbar, text='*Status Window*',
@@ -58,13 +67,13 @@ class Monitor(tk.Tk):
         self.progress_bar = ttk.Progressbar(self.toolbar, orient='horizontal', mode='indeterminate', length=200)
         btn_realtime = ttk.Button(self.toolbar, text='Real-time', command=self.start_realtime_process)
         btn_daterange = ttk.Button(self.toolbar, text='Date Range', command=self.daterange, state='disabled') #Re-enable once daterange is implemented
-        btn_1hr = ttk.Button(self.toolbar, text='1 Hour', command=lambda: self.refresh_plots('1h', self.progress_bar))
-        btn_8hr = ttk.Button(self.toolbar, text='8 Hours', command=lambda: self.refresh_plots('8h', self.progress_bar))
-        btn_24hr = ttk.Button(self.toolbar, text='24 Hours', command=lambda: self.refresh_plots('24h', self.progress_bar))
-        btn_7days = ttk.Button(self.toolbar, text='7 Days', command=lambda: self.refresh_plots('7d', self.progress_bar))
-        btn_1month = ttk.Button(self.toolbar, text='1 Month', command=lambda: self.refresh_plots('1m', self.progress_bar))
-        btn_6month = ttk.Button(self.toolbar, text='6 Month', command=lambda: self.refresh_plots('6m', self.progress_bar))
-        btn_1year = ttk.Button(self.toolbar, text='1 Year', command=lambda: self.refresh_plots('1y', self.progress_bar))
+        btn_1hr = ttk.Button(self.toolbar, text='1 Hour', command=lambda: Thread(target=self.refresh_plots_thread, args=('1h',)).start())
+        btn_8hr = ttk.Button(self.toolbar, text='8 Hours', command=lambda: Thread(target=self.refresh_plots_thread, args=('8h',)).start())
+        btn_24hr = ttk.Button(self.toolbar, text='24 Hours', command=lambda: Thread(target=self.refresh_plots_thread, args=('24h',)).start())
+        btn_7days = ttk.Button(self.toolbar, text='7 Days', command=lambda: Thread(target=self.refresh_plots_thread, args=('7d',)).start())
+        btn_1month = ttk.Button(self.toolbar, text='1 Month', command=lambda: Thread(target=self.refresh_plots_thread, args=('1m',)).start())
+        btn_6month = ttk.Button(self.toolbar, text='6 Month', command=lambda: Thread(target=self.refresh_plots_thread, args=('6m',)).start())
+        btn_1year = ttk.Button(self.toolbar, text='1 Year', command=lambda: Thread(target=self.refresh_plots_thread, args=('1y',)).start())
         btn_exit = ttk.Button(self.toolbar, text='Exit', command=self.close_app)
         # self.status_bar.grid(row=0, column=0, sticky='ew')
         self.progress_bar.grid(row=0, column=0, sticky='ew')
@@ -90,13 +99,13 @@ class Monitor(tk.Tk):
         self.pms_figure.pms_concentration.cla()
         self.pms_figure.pms_counts.cla()
     
-    def refresh_plots(self, timespan: str, pb_object: ttk.Progressbar):
+    def refresh_plots(self, timespan: str):
         resample_dict = {'1h': '5T', '8h': '20T', '24h': 'H',
                          '7d': 'H', '1m': 'D', '6m': 'D',
                          '1y': 'W'}
         data_files = os.listdir(self.archive.data_dir)
         fn_delta = self.archive.cap_archive_list(data_files, limit=timespan)
-        self.plot_data = self.archive.create_df(fn_delta, pb_object)
+        self.plot_data = self.archive.create_df(fn_delta)
         # Clear plots
         self.clear_plots()
         # Plot temperature, humidity, pressure

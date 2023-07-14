@@ -4,7 +4,6 @@ import re
 from tkinter import ttk
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor
-from threading import Thread
 
 class ReadArchive:
     def __init__(self, data_dir='./data/'):
@@ -25,8 +24,7 @@ class ReadArchive:
                 nums.append(np.nan)
         return nums
 
-    def create_df(self, files: list, progress_object: ttk.Progressbar) -> pd.DataFrame:
-        # pb = progress_object
+    def create_df(self, files: list) -> pd.DataFrame:
         for i, file in enumerate(files):
             if '.txt' not in file:
                 files.pop(i)
@@ -34,12 +32,7 @@ class ReadArchive:
             header = f.readline()
             header = header[:-1].split(' ')
         with ProcessPoolExecutor() as executor:
-            data_mp = executor.map(self.read_file, files)
-        data_mp = [i for i in data_mp]
-        data = []
-        for cpu_core in data_mp:
-            for sample in cpu_core:
-                data.append(sample)
+            data = [sample for result in executor.map(self.read_file, files) for sample in result]
         data = self.remove_nan(data)
         df = pd.DataFrame(data=data, columns=header)
         df_datetime = pd.to_datetime([datetime.fromtimestamp(i) for i in df['timestamp'].values])
