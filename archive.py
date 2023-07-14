@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 import pandas as pd
-import re
+import re, os
 from tkinter import ttk
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor
@@ -23,6 +23,19 @@ class ReadArchive:
             except ValueError:
                 nums.append(np.nan)
         return nums
+    
+    def date_range(self, start_date: str, end_date: str) -> list:
+        start_date = datetime.strptime(start_date, self.fn_format)
+        end_date = datetime.strptime(end_date, self.fn_format)
+        all_files = os.listdir(self.data_dir)
+        selected_files = []
+        for file in all_files:
+            match = self.re_compile.search(file)
+            if match:
+                file_date = datetime.strptime(match.group(), self.fn_format)
+                if start_date <= file_date <= end_date:
+                    selected_files.append(file)
+        return selected_files
 
     def create_df(self, files: list) -> pd.DataFrame:
         for i, file in enumerate(files):

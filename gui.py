@@ -1,11 +1,13 @@
 import tkinter as tk
 from tkinter import ttk
+from tkcalendar import Calendar, DateEntry
 from archive import ReadArchive
 from sensors import Sensors
 import sys, os
 from multiprocessing import Process, Queue
 from threading import Thread
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from time import sleep
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -54,19 +56,26 @@ class Monitor(tk.Tk):
     
     def refresh_plots_thread(self, time_range):
         self.progress_bar.start()
-        # Refresh plots in a separate thread to prevent GUI from freezing
         self.status_bar.config(text='Refreshing plots...')
         self.refresh_plots(time_range)
         self.status_bar.config(text='*Status Window*')
         self.progress_bar.stop()
     
+    def refresh_daterange_plots_thread(self, daterange_files):
+        self.progress_bar.start()
+        self.status_bar.config(text='Refreshing plots...')
+        self.refresh_daterange_plots(daterange_files)
+        self.status_bar.config(text='*Status Window*')
+        self.progress_bar.stop()
+
+    
     def create_toolbar(self):
         self.toolbar = tk.Frame(self.root_frame, bg='white')
-        self.status_bar = ttk.Label(self.toolbar, text='*Status Window*',
-            relief='sunken', width=40)
+        # self.status_bar = ttk.Label(self.toolbar, text='*Status Window*',
+        #     relief='sunken', width=40)
         self.progress_bar = ttk.Progressbar(self.toolbar, orient='horizontal', mode='indeterminate', length=200)
-        btn_realtime = ttk.Button(self.toolbar, text='Real-time', command=self.start_realtime_process)
-        btn_daterange = ttk.Button(self.toolbar, text='Date Range', command=self.daterange, state='disabled') #Re-enable once daterange is implemented
+        btn_realtime = ttk.Button(self.toolbar, text='Real-time', command=self.start_realtime_process, state='disabled') # Re-enable once realtime is implemented
+        btn_daterange = ttk.Button(self.toolbar, text='Date Range', command=self.get_daterange, state='enabled')
         btn_1hr = ttk.Button(self.toolbar, text='1 Hour', command=lambda: Thread(target=self.refresh_plots_thread, args=('1h',)).start())
         btn_8hr = ttk.Button(self.toolbar, text='8 Hours', command=lambda: Thread(target=self.refresh_plots_thread, args=('8h',)).start())
         btn_24hr = ttk.Button(self.toolbar, text='24 Hours', command=lambda: Thread(target=self.refresh_plots_thread, args=('24h',)).start())
@@ -89,8 +98,35 @@ class Monitor(tk.Tk):
         btn_exit.grid(row=0, column=10, padx=5, sticky='e')
         self.toolbar.grid(row=2, column=0, sticky='ew')
     
-    def daterange(self):
-        pass
+    def get_daterange(self):
+        current_date = datetime.now()
+        back_date = current_date - relativedelta(months=1)
+        top = tk.Toplevel(self)
+        top.title('Date Range')
+        lbl_start_date = ttk.Label(top, text='From: ')
+        lbl_end_date = ttk.Label(top, text='To: ')
+        cal_start_date = DateEntry(top, width=12, background='darkblue',
+                                   foreground='white', borderwidth=2,
+                                   year=back_date.year, month=back_date.month,
+                                   day=back_date.day)
+        cal_end_date = DateEntry(top, width=12, background='darkblue',
+                                 foreground='white', borderwidth=2,
+                                 year=current_date.year, month=current_date.month,
+                                 day=current_date.day)
+        btn_ok = ttk.Button(top, text='OK', command=lambda: Thread(target=on_closing).start())
+        lbl_start_date.grid(row=0, column=0, padx=5, pady=5)
+        lbl_end_date.grid(row=0, column=2, padx=5, pady=5)
+        cal_start_date.grid(row=0, column=1, padx=5, pady=5)
+        cal_end_date.grid(row=0, column=3, padx=5, pady=5)
+        btn_ok.grid(row=1, columnspan=4, padx=5, pady=5)
+        def on_closing():
+            self.progress_bar.start()
+            sd = cal_start_date.get_date().strftime('%Y-%m-%d %H-%M-%S')
+            ed = cal_end_date.get_date().strftime('%Y-%m-%d %H-%M-%S')
+            dr_files = self.archive.date_range(sd, ed)
+            self.refresh_daterange_plots(dr_files)
+            self.progress_bar.stop()
+            top.destroy()
     
     def clear_plots(self):
         self.thp_figure.th.cla()
@@ -124,7 +160,28 @@ class Monitor(tk.Tk):
         self.pms_figure.pms_counts.plot(self.plot_data_rs.index, self.plot_data_rs['particles_50um'], label='5.0 $\mu$m')
         self.pms_figure.pms_counts.plot(self.plot_data_rs.index, self.plot_data_rs['particles_100um'], label='10.0 $\mu$m')
         self.reset_figures()
-    
+
+    def refresh_daterange_plots(self, daterange_files: list):
+        self.plot_data = self.archive.create_df(daterange_files)
+        # Clear plots
+        self.clear_plots()
+        # Plot temperature, humidity, pressure
+        self.thp_figure.th.plot(self.plot_data.index, self.plot_data['temperature'], color='C0', label='temperature')
+        self.thp_figure.th2.plot(self.plot_data.index, self.plot_data['humidity'], color='C1', label='humidity')
+        self.thp_figure.p.plot(self.plot_data.index, self.plot_data['pressure'], color='C2', label='pressure')
+        # Plot particle data
+        # self.plot_data_rs = self.plot_data.resample(resample_dict[daterange_files]).mean()
+        self.pms_figure.pms_concentration.plot(self.plot_data.index, self.plot_data['pm10_standard'], label='1.0 $\mu$m')
+        self.pms_figure.pms_concentration.plot(self.plot_data.index, self.plot_data['pm25_standard'], label='2.5 $\mu$m')
+        self.pms_figure.pms_concentration.plot(self.plot_data.index, self.plot_data['pm100_standard'], label='10.0 $\mu$m')
+        self.pms_figure.pms_counts.plot(self.plot_data.index, self.plot_data['particles_03um'], label='0.3 $\mu$m')
+        self.pms_figure.pms_counts.plot(self.plot_data.index, self.plot_data['particles_05um'], label='0.5 $\mu$m')
+        self.pms_figure.pms_counts.plot(self.plot_data.index, self.plot_data['particles_10um'], label='1.0 $\mu$m')
+        self.pms_figure.pms_counts.plot(self.plot_data.index, self.plot_data['particles_25um'], label='2.5 $\mu$m')
+        self.pms_figure.pms_counts.plot(self.plot_data.index, self.plot_data['particles_50um'], label='5.0 $\mu$m')
+        self.pms_figure.pms_counts.plot(self.plot_data.index, self.plot_data['particles_100um'], label='10.0 $\mu$m')
+        self.reset_figures()
+
     def reset_figures(self):
         # Reset figures
         self.thp_figure.reset_thp()
