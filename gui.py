@@ -55,7 +55,7 @@ class Monitor(tk.Tk):
         self.toolbar = tk.Frame(self.root_frame, bg='white')
         self.status_bar = ttk.Label(self.toolbar, text='*Status Window*',
             relief='sunken', width=40)
-        self.progress_bar = ttk.Progressbar(self.toolbar, orient='horizontal', mode='determinate', length=200)
+        self.progress_bar = ttk.Progressbar(self.toolbar, orient='horizontal', mode='indeterminate', length=200)
         btn_realtime = ttk.Button(self.toolbar, text='Real-time', command=self.start_realtime_process)
         btn_daterange = ttk.Button(self.toolbar, text='Date Range', command=self.daterange, state='disabled') #Re-enable once daterange is implemented
         btn_1hr = ttk.Button(self.toolbar, text='1 Hour', command=lambda: self.refresh_plots('1h', self.progress_bar))

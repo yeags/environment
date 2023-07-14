@@ -1,9 +1,10 @@
-from time import timedelta
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 import re
 from tkinter import ttk
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor
+from threading import Thread
 
 class ReadArchive:
     def __init__(self, data_dir='./data/'):
@@ -25,23 +26,21 @@ class ReadArchive:
         return nums
 
     def create_df(self, files: list, progress_object: ttk.Progressbar) -> pd.DataFrame:
+        # pb = progress_object
         for i, file in enumerate(files):
             if '.txt' not in file:
                 files.pop(i)
-        progress_object.configure(maximum=len(files))
         with open(self.data_dir + files[0]) as f:
             header = f.readline()
             header = header[:-1].split(' ')
+        with ProcessPoolExecutor() as executor:
+            data_mp = executor.map(self.read_file, files)
+        data_mp = [i for i in data_mp]
         data = []
-        for file in files:
-            with open(self.data_dir + file) as f:
-                f.readline()
-                contents = f.read()
-            lines = contents[:-1].split('\n')
-            for line in lines:
-                data.append(self.txt2num(line[:-1]))
-            progress_object.step()
-            progress_object.update()
+        for cpu_core in data_mp:
+            for sample in cpu_core:
+                data.append(sample)
+        data = self.remove_nan(data)
         df = pd.DataFrame(data=data, columns=header)
         df_datetime = pd.to_datetime([datetime.fromtimestamp(i) for i in df['timestamp'].values])
         df['datetime'] = df_datetime
@@ -54,6 +53,25 @@ class ReadArchive:
         df['particles_25um'] = df['particles_25um'] - df['particles_50um']
         df['particles_50um'] = df['particles_50um'] - df['particles_100um']
         return df
+
+    def remove_nan(self, data: list) -> list:
+        pop_list = []
+        for i, sample in enumerate(data):
+            if np.isnan(sample[0]):
+                pop_list.append(i)
+        for i in pop_list[::-1]:
+            data.pop(i)
+        return data
+
+    def read_file(self, filename):
+        with open(self.data_dir + filename) as f:
+            f.readline()
+            contents = f.read()
+        lines = contents[:-1].split('\n')
+        data = []
+        for line in lines:
+            data.append(self.txt2num(line[:-1]))
+        return data
 
     def cap_archive_list(self, files: list, limit='1h') -> list:
         files_str = ' '.join(files)
