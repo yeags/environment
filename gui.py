@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-from tkcalendar import Calendar, DateEntry
+from tkcalendar import DateEntry
 from archive import ReadArchive
 from sensors import Sensors
 import sys, os
@@ -71,8 +71,8 @@ class Monitor(tk.Tk):
     
     def create_toolbar(self):
         self.toolbar = tk.Frame(self.root_frame, bg='white')
-        # self.status_bar = ttk.Label(self.toolbar, text='*Status Window*',
-        #     relief='sunken', width=40)
+        self.status_bar = ttk.Label(self.toolbar, text='*Status Window*',
+            relief='sunken', width=40)
         self.progress_bar = ttk.Progressbar(self.toolbar, orient='horizontal', mode='indeterminate', length=200)
         btn_realtime = ttk.Button(self.toolbar, text='Real-time', command=self.start_realtime_process, state='disabled') # Re-enable once realtime is implemented
         btn_daterange = ttk.Button(self.toolbar, text='Date Range', command=self.get_daterange, state='enabled')
