@@ -27,10 +27,7 @@ class Sensors:
             self.pm25 = adafruit_pm25.PM25_UART(self.uart, self.reset_pin)
         except serial.SerialException:
             self.popup('Serial device not found.')
-        self.header = 'timestamp temperature humidity pressure \
-            pm10_standard pm25_standard pm100_standard pm10_env \
-            pm25_env pm100_env particles_03um particles_05um particles_10um \
-            particles_25um particles_50um particles_100um\n'
+        self.header = 'timestamp temperature humidity pressure pm10_standard pm25_standard pm100_standard pm10_env pm25_env pm100_env particles_03um particles_05um particles_10um particles_25um particles_50um particles_100um\n'
         self.nan_dict = {
             'pm10 standard': None,
             'pm25 standard': None,
@@ -48,18 +45,19 @@ class Sensors:
         self.file_state = 0
         self.filename = None
         self.sampling_buffer = Queue()
+        self.daemon_status = Queue()
     
     def start_daemon(self):
         print('Starting daemon...')
-        self.daemon_status = True
-        self.daemon = Process(target=self.start_loop)
+        self.daemon = Process(target=self.start_loop, args=(self.sampling_buffer, self.daemon_status))
         self.daemon.start()
         print('Daemon started.')
     
     def stop_daemon(self):
         print('Stopping daemon...')
-        self.daemon_status = False
-        self.daemon.join()
+        self.daemon_status.put(1)
+        self.daemon.kill()
+        # self.daemon.join()
         print('Daemon stopped.')
     
     def popup(msg):
@@ -87,22 +85,23 @@ class Sensors:
         packet = f"{now.timestamp()} {round(temperature, 1)} {round(humidity, 1)} {round(pressure, 1)} {particles_packet}\n"
         return packet
     
-    def start_loop(self):
+    def start_loop(self, sampling_buffer, daemon_status):
+        ds = daemon_status
         # loop while daemon_status is set to True
-        while self.daemon_status:
+        while ds.empty():
             fn_dt = datetime.now()
             self.init_file(fn_dt)
             while self.loop_counter < self.reset_threshold:
                 self.savefile = open(self.savefile.name, 'a')
                 sample = self.read_sensors()
                 self.savefile.write(sample)
-                self.sampling_buffer.put(sample)
+                sampling_buffer.put(sample)
                 sleep(self.sampling_delay)
                 self.savefile.close()
                 self.loop_counter += 1
             # empty queue and reset counter once it reaches reset threshold
-            for i in range(self.sampling_buffer.qsize()):
-                self.sampling_buffer.get()
+            for i in range(sampling_buffer.qsize()):
+                sampling_buffer.get()
             self.loop_counter = 0
 
     def init_file(self, dt: datetime):
@@ -110,3 +109,11 @@ class Sensors:
         self.savefile = open(filename, 'w')
         self.savefile.write(self.header)
         self.savefile.close()
+
+if __name__ == '__main__':
+    from time import sleep
+    s = Sensors()
+    s.start_daemon()
+    print('waiting 30 seconds')
+    sleep(30)
+    s.stop_daemon()
