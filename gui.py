@@ -23,6 +23,7 @@ class Monitor(tk.Tk):
         if 'board' in sys.modules:
             self.sensor_active = True
             self.sensor_daemon = Sensors()
+            self.sensor_daemon.start_daemon()
         self.title('Environment Monitor')
         self.geometry('1280x1024')
         self.rowconfigure(0, weight=1)
@@ -39,10 +40,10 @@ class Monitor(tk.Tk):
     def close_app(self):
         if self.sensor_active:
             self.sensor_daemon.stop_daemon()
-            try:
-                self.stop_realtime_process()
-            except:
-                pass
+            # try:
+            #     self.stop_realtime_process()
+            # except:
+            #     pass
         self.destroy()
         sys.exit()
 
