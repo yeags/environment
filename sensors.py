@@ -56,8 +56,8 @@ class Sensors:
     def stop_daemon(self):
         print('Stopping daemon...')
         self.daemon_status.put(1)
-        self.daemon.kill()
-        # self.daemon.join()
+        # self.daemon.kill()
+        self.daemon.join()
         print('Daemon stopped.')
     
     def popup(msg):
@@ -85,10 +85,9 @@ class Sensors:
         packet = f"{now.timestamp()} {round(temperature, 1)} {round(humidity, 1)} {round(pressure, 1)} {particles_packet}\n"
         return packet
     
-    def start_loop(self, sampling_buffer, daemon_status):
-        ds = daemon_status
-        # loop while daemon_status is set to True
-        while ds.empty():
+    def start_loop(self, sampling_buffer: Queue, daemon_status: Queue):
+        # loop while daemon_status is empty
+        while daemon_status.empty():
             fn_dt = datetime.now()
             self.init_file(fn_dt)
             while self.loop_counter < self.reset_threshold:
@@ -99,6 +98,8 @@ class Sensors:
                 sleep(self.sampling_delay)
                 self.savefile.close()
                 self.loop_counter += 1
+                if daemon_status.empty() == False:
+                    break
             # empty queue and reset counter once it reaches reset threshold
             for i in range(sampling_buffer.qsize()):
                 sampling_buffer.get()
