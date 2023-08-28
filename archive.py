@@ -76,7 +76,10 @@ class ReadArchive:
         lines = contents[:-1].split('\n')
         data = []
         for line in lines:
-            data.append(self.txt2num(line[:-1]))
+            if line.endswith(' '):
+                data.append(self.txt2num(line[:-1]))
+            else:
+                data.append(self.txt2num(line))
         return data
 
     def cap_archive_list(self, files: list, limit='1h') -> list:
