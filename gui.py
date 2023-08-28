@@ -146,8 +146,16 @@ class Monitor(tk.Tk):
         # Clear plots
         self.clear_plots()
         # Plot temperature, humidity, pressure
+        temp_min = 18
+        temp_max = 24
         self.thp_figure.th.plot(self.plot_data.index, self.plot_data['temperature'], color='C0', label='temperature')
+        self.thp_figure.th.axhline(y=temp_min, color='C0', linestyle='--', label='lower temp limit')
+        self.thp_figure.th.axhline(y=temp_max, color='C0', linestyle='--', label='upper temp limit')
+        self.thp_figure.th.fill_between(self.plot_data.index, temp_min, temp_max, color='C0', alpha=0.2)
         self.thp_figure.th2.plot(self.plot_data.index, self.plot_data['humidity'], color='C1', label='humidity')
+        self.thp_figure.th2.axhline(y=40, color='C1', linestyle='--', label='lower humidity limit')
+        self.thp_figure.th2.axhline(y=70, color='C1', linestyle='--', label='upper humidity limit')
+        self.thp_figure.th2.fill_between(self.plot_data.index, 40, 70, color='C1', alpha=0.2)
         self.thp_figure.p.plot(self.plot_data.index, self.plot_data['pressure'], color='C2', label='pressure')
         # Plot particle data
         self.plot_data_rs = self.plot_data.resample(resample_dict[timespan]).mean()
@@ -167,8 +175,16 @@ class Monitor(tk.Tk):
         # Clear plots
         self.clear_plots()
         # Plot temperature, humidity, pressure
+        temp_min = 18
+        temp_max = 24
         self.thp_figure.th.plot(self.plot_data.index, self.plot_data['temperature'], color='C0', label='temperature')
+        self.thp_figure.th.axhline(y=temp_min, color='C0', linestyle='--', label='lower temp limit')
+        self.thp_figure.th.axhline(y=temp_max, color='C0', linestyle='--', label='upper temp limit')
+        self.thp_figure.th.fill_between(self.plot_data.index, temp_min, temp_max, color='C0', alpha=0.2)
         self.thp_figure.th2.plot(self.plot_data.index, self.plot_data['humidity'], color='C1', label='humidity')
+        self.thp_figure.th2.axhline(y=40, color='C1', linestyle='--', label='lower humidity limit')
+        self.thp_figure.th2.axhline(y=70, color='C1', linestyle='--', label='upper humidity limit')
+        self.thp_figure.th2.fill_between(self.plot_data.index, 40, 70, color='C1', alpha=0.2)
         self.thp_figure.p.plot(self.plot_data.index, self.plot_data['pressure'], color='C2', label='pressure')
         # Plot particle data
         # self.plot_data_rs = self.plot_data.resample(resample_dict[daterange_files]).mean()
