@@ -58,6 +58,7 @@ class ReadArchive:
         df['particles_10um'] = df['particles_10um'] - df['particles_25um']
         df['particles_25um'] = df['particles_25um'] - df['particles_50um']
         df['particles_50um'] = df['particles_50um'] - df['particles_100um']
+        df = df.sort_index()
         return df
 
     def remove_nan(self, data: list) -> list:
