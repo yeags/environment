@@ -1,4 +1,5 @@
-data\
+data/
+data_old/
 settings.json
 archive.cpython-39.pyc
 gui.cpython-39.pycsensors.cpython-39.pyc
