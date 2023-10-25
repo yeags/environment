@@ -11,7 +11,7 @@ class ReadArchive:
         self.fn_format = '%Y-%m-%d %H-%M-%S'
         self.re_compile = re.compile(r'\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}')
         self.delta_dict = {'1h': timedelta(hours=1), '8h': timedelta(hours=8), '24h': timedelta(hours=24),
-                           '7d': timedelta(days=7), '1m': timedelta(days=30), '6m': timedelta(days=90),
+                           '7d': timedelta(days=7), '1m': timedelta(days=30), '6m': timedelta(days=180),
                            '1y': timedelta(days=365)}
     
     def txt2num(self, sample: str) -> list:
