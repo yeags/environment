@@ -36,6 +36,7 @@ class Monitor(tk.Tk):
         self.create_thp_plot()
         self.create_pms_plot()
         self.create_toolbar()
+        self.protocol('WM_DELETE_WINDOW', self.close_app)
     
     def close_app(self):
         if self.sensor_active:
@@ -44,7 +45,7 @@ class Monitor(tk.Tk):
             #     self.stop_realtime_process()
             # except:
             #     pass
-        self.destroy()
+        # self.destroy()
         sys.exit()
 
     def create_thp_plot(self):
