@@ -51,10 +51,14 @@ class Monitor(tk.Tk):
     def create_thp_plot(self):
         self.thp_figure = thpFigure(self.root_frame)
         self.thp_figure.grid(row=0, column=0, sticky='nsew')
+        self.thp_figure.rowconfigure(0, weight=1)
+        self.thp_figure.columnconfigure(0, weight=1)
 
     def create_pms_plot(self):
         self.pms_figure = pmsFigure(self.root_frame)
         self.pms_figure.grid(row=1, column=0, sticky='nsew')
+        self.pms_figure.rowconfigure(1, weight=1)
+        self.pms_figure.columnconfigure(0, weight=1)
     
     def refresh_plots_thread(self, time_range):
         self.progress_bar.start()
@@ -253,10 +257,10 @@ class Monitor(tk.Tk):
         self.realtime_process.terminate()
 
 class thpFigure(tk.Frame):
-    def __init__(self, parent):
+    def __init__(self, parent, dpi=94):
         super().__init__(parent)
         # self.screen_dpi = 86
-        self.screen_dpi = 94
+        self.screen_dpi = dpi
         self.config(bg='white')
         self.create_figure()
         self.thp_plot.get_tk_widget().grid(row=0, column=0, sticky='nsew')
@@ -301,14 +305,16 @@ class thpFigure(tk.Frame):
         self.p.grid()
     
 class pmsFigure(tk.Frame):
-    def __init__(self, parent):
+    def __init__(self, parent, dpi=94):
         super().__init__(parent)
         self.particle_sizes = ['0.3', '0.5', '1.0', '2.5', '5.0', '10.0']
         # self.screen_dpi = 86
-        self.screen_dpi = 94
+        self.screen_dpi = dpi
         self.config(bg='white')
         self.create_figure()
         self.pms_plot.get_tk_widget().grid(row=0, column=0, sticky='nsew')
+        self.pms_plot.get_tk_widget().rowconfigure(0, weight=1)
+        self.pms_plot.get_tk_widget().columnconfigure(0, weight=1)
     
     def create_figure(self):
         self.fig, (self.pms_concentration, self.pms_counts) = plt.subplots(nrows=2, ncols=1,
