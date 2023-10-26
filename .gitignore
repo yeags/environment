@@ -2,5 +2,6 @@ data/
 data_old/
 __pycache__/
 settings.json
-archive.cpython-39.pyc
-gui.cpython-39.pycsensors.cpython-39.pyc
+__pycache__/archive.cpython-39.pyc
+__pycache__/gui.cpython-39.pycsensors.cpython-39.pyc
+__pycache__/gui.cpython-39.pyc
