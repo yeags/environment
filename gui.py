@@ -24,6 +24,7 @@ class Monitor(tk.Tk):
             self.sensor_active = True
             self.sensor_daemon = Sensors()
             self.sensor_daemon.start_daemon()
+            self.sensor_daemon.start_latest_readings_thread()
         self.title('Environment Monitor')
         self.geometry('1280x1024')
         self.rowconfigure(0, weight=1)
@@ -32,9 +33,11 @@ class Monitor(tk.Tk):
         self.root_frame.config(bg='white')
         self.root_frame.columnconfigure(0, weight=1)
         self.root_frame.rowconfigure(0, weight=1)
+        self.root_frame.rowconfigure(1, weight=1)
         self.root_frame.grid(row=0, column=0, sticky='nsew')
         self.create_thp_plot()
         self.create_pms_plot()
+        self.create_live_readout()
         self.create_toolbar()
         self.protocol('WM_DELETE_WINDOW', self.close_app)
     
@@ -60,6 +63,79 @@ class Monitor(tk.Tk):
         self.pms_figure.rowconfigure(1, weight=1)
         self.pms_figure.columnconfigure(0, weight=1)
     
+    def create_live_readout(self):
+        self.live_readout_frame = ttk.LabelFrame(self.root_frame, text='Current Sensor Readings')
+        self.live_readout_frame.grid(row=2, column=0, sticky='ew', padx=10, pady=(5, 0))
+        for col in range(6):
+            weight = 1 if col % 2 else 0
+            self.live_readout_frame.columnconfigure(col, weight=weight)
+        self.readout_fields = [
+            {'key': 'temperature', 'label': 'Temperature', 'unit': 'C', 'decimals': 1},
+            {'key': 'humidity', 'label': 'Humidity', 'unit': '%', 'decimals': 1},
+            {'key': 'pressure', 'label': 'Pressure', 'unit': 'mBar', 'decimals': 1},
+            {'key': 'pm10_standard', 'label': 'PM1.0', 'unit': 'ug/m3', 'decimals': 1},
+            {'key': 'pm25_standard', 'label': 'PM2.5', 'unit': 'ug/m3', 'decimals': 1},
+            {'key': 'pm100_standard', 'label': 'PM10', 'unit': 'ug/m3', 'decimals': 1},
+        ]
+        self.readout_vars = {field['key']: tk.StringVar(value='--') for field in self.readout_fields}
+        default_timestamp = 'Sensors offline' if not self.sensor_active else 'Waiting for data...'
+        self.readout_vars['timestamp'] = tk.StringVar(value=default_timestamp)
+        ttk.Label(self.live_readout_frame, text='Last Update:').grid(row=0, column=0, sticky='w')
+        ttk.Label(self.live_readout_frame, textvariable=self.readout_vars['timestamp']).grid(row=0, column=1, columnspan=5, sticky='w')
+        for col, field in enumerate(self.readout_fields[:3]):
+            label_col = col * 2
+            value_col = label_col + 1
+            ttk.Label(self.live_readout_frame, text=f"{field['label']}:").grid(row=1, column=label_col, sticky='w', padx=(0, 4))
+            ttk.Label(self.live_readout_frame, textvariable=self.readout_vars[field['key']]).grid(row=1, column=value_col, sticky='w', padx=(0, 12))
+        for col, field in enumerate(self.readout_fields[3:]):
+            label_col = col * 2
+            value_col = label_col + 1
+            ttk.Label(self.live_readout_frame, text=f"{field['label']}:").grid(row=2, column=label_col, sticky='w', padx=(0, 4))
+            ttk.Label(self.live_readout_frame, textvariable=self.readout_vars[field['key']]).grid(row=2, column=value_col, sticky='w', padx=(0, 12))
+        self._set_default_readout_values()
+        self.update_live_readout()
+
+    def _set_default_readout_values(self):
+        for field in getattr(self, 'readout_fields', []):
+            self.readout_vars[field['key']].set('--')
+
+    def _format_readout_value(self, value, field):
+        if value is None:
+            return '--'
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return '--'
+        formatted = f"{numeric:.{field['decimals']}f}"
+        return f"{formatted} {field['unit']}" if field['unit'] else formatted
+
+    def update_live_readout(self):
+        if not hasattr(self, 'readout_vars'):
+            return
+        sensor_available = self.sensor_active and hasattr(self, 'sensor_daemon')
+        if not sensor_available:
+            self.readout_vars['timestamp'].set('Sensors offline')
+            self._set_default_readout_values()
+        else:
+            latest = self.sensor_daemon.get_latest_reading()
+            if latest:
+                timestamp = latest.get('timestamp')
+                if isinstance(timestamp, datetime):
+                    ts_text = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                elif timestamp:
+                    ts_text = str(timestamp)
+                else:
+                    ts_text = 'No timestamp'
+                self.readout_vars['timestamp'].set(ts_text)
+                for field in self.readout_fields:
+                    self.readout_vars[field['key']].set(
+                        self._format_readout_value(latest.get(field['key']), field)
+                    )
+            else:
+                self.readout_vars['timestamp'].set('Waiting for data...')
+                self._set_default_readout_values()
+        self.after(1000, self.update_live_readout)
+
     def refresh_plots_thread(self, time_range):
         self.progress_bar.start()
         self.status_bar.config(text='Refreshing plots...')
@@ -102,7 +178,7 @@ class Monitor(tk.Tk):
         btn_6month.grid(row=0, column=8, padx=5, sticky='w')
         btn_1year.grid(row=0, column=9, padx=5, sticky='w')
         btn_exit.grid(row=0, column=10, padx=5, sticky='e')
-        self.toolbar.grid(row=2, column=0, sticky='ew')
+        self.toolbar.grid(row=3, column=0, sticky='ew')
     
     def get_daterange(self):
         current_date = datetime.now()
