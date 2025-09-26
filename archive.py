@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 import pandas as pd
 import re, os
-from tkinter import ttk
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor
 
