@@ -12,7 +12,7 @@ try:
     import busio
     import adafruit_bme280, adafruit_pm25
 except ModuleNotFoundError:
-    pass
+    print('Raspberry Pi libraries not found. Continuing anyway...')
 
 class Sensors:
     def __init__(self, data_folder='./data/', serial_port='/dev/ttyS0'):
