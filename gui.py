@@ -34,6 +34,8 @@ class Monitor(tk.Tk):
         self.root_frame.columnconfigure(0, weight=1)
         self.root_frame.rowconfigure(0, weight=1)
         self.root_frame.rowconfigure(1, weight=1)
+        self.root_frame.rowconfigure(2, weight=0)
+        self.root_frame.rowconfigure(3, weight=0)
         self.root_frame.grid(row=0, column=0, sticky='nsew')
         self.create_thp_plot()
         self.create_pms_plot()
@@ -343,7 +345,7 @@ class thpFigure(tk.Frame):
     
     def create_figure(self):
         self.fig, (self.th, self.p) = plt.subplots(nrows=2, ncols=1, sharex=True,
-            figsize=(1280 / self.screen_dpi, 500 / self.screen_dpi),
+            figsize=(1280 / self.screen_dpi, 420 / self.screen_dpi),
             dpi=self.screen_dpi)
         # self.fig.autofmt_xdate()
         self.thp_plot = FigureCanvasTkAgg(self.fig, master=self)
@@ -394,7 +396,7 @@ class pmsFigure(tk.Frame):
     
     def create_figure(self):
         self.fig, (self.pms_concentration, self.pms_counts) = plt.subplots(nrows=2, ncols=1,
-            figsize=(1280 / self.screen_dpi, 500 / self.screen_dpi),
+            figsize=(1280 / self.screen_dpi, 420 / self.screen_dpi),
             dpi=self.screen_dpi)
         self.fig.subplots_adjust(hspace=0.5)
         self.pms_plot = FigureCanvasTkAgg(self.fig, master=self)
