@@ -433,7 +433,7 @@ class pmsFigure(tk.Frame):
         pos = Bbox([[0.125, 0.1], [0.9, 0.44]])
         self.pms_counts.set_position([pos.x0, pos.y0, pos.width * 0.95, pos.height])
         self.pms_counts.legend(loc='center right', bbox_to_anchor=(1.125, 0.5))
-        # rotate x tick labels by 45 degrees
+        # rotate x tick labels by 30 degrees
         for tick in self.pms_concentration.get_xticklabels():
             tick.set_rotation(30)
         for tick in self.pms_counts.get_xticklabels():
